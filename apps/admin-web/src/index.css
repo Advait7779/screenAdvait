@@ -1,0 +1,89 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,300..800&family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700;800&family=Poppins:wght@300;400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  :root,
+  body,
+  #root,
+  *,
+  button,
+  input,
+  select,
+  textarea {
+    font-family: 'Plus Jakarta Sans', 'Outfit', 'Inter', 'Poppins', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  }
+  body {
+    @apply bg-slate-50 text-slate-900 antialiased;
+    font-family: 'Plus Jakarta Sans', 'Outfit', 'Inter', 'Poppins', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+    min-width: 320px;
+  }
+  input::-webkit-calendar-picker-indicator {
+    display: none !important;
+    opacity: 0 !important;
+    appearance: none !important;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(30px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes popIn {
+  from {
+    opacity: 0;
+    transform: scale(0.94) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes toastProgress {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
+  }
+}
+
+.page-fade-in {
+  animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.toast-slide-in {
+  animation: slideInRight 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.modal-pop-in {
+  animation: popIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.toast-progress-bar {
+  animation: toastProgress 4s linear forwards;
+}

@@ -1,0 +1,15 @@
+packages:
+  - 'apps/*'
+  - 'services/*'
+  - 'packages/*'
+
+allowBuilds:
+  '@prisma/client': set this to true or false
+  '@prisma/engines': set this to true or false
+  better-sqlite3: set this to true or false
+  electron-winstaller: set this to true or false
+  esbuild: set this to true or false
+  prisma: set this to true or false
+
+overrides:
+  'glob@>=10.2.0 <10.5.0': 10.5.0

@@ -1,61 +1,80 @@
 import { Injectable, ConflictException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CreateCompanyInput } from '@screenadvait/shared-utils';
-import { LicensePlan, SubscriptionStatus } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
+import * as crypto from 'crypto';
 
 @Injectable()
 export class CompanyService {
   constructor(private prisma: PrismaService) {}
 
-  async createCompany(input: CreateCompanyInput) {
-    const existing = await this.prisma.company.findUnique({
-      where: { code: input.code },
+  async createCompany(input: CreateCompanyInput, createdByUserId: string) {
+    const existing = await this.prisma.company.findFirst({
+      where: {
+        OR: [
+          { code: input.code },
+          { name: { equals: input.name.trim(), mode: 'insensitive' } },
+        ],
+      },
     });
 
     if (existing) {
-      throw new ConflictException('Company code already exists');
+      throw new ConflictException('A company with this name or code already exists');
     }
 
-    const passwordHash = await bcrypt.hash('Admin@12345', 12);
-    const startDate = new Date();
-    const endDate = new Date();
-    endDate.setDate(startDate.getDate() + 365); // 1 year default active subscription
+    const temporaryPassword = `${crypto.randomBytes(18).toString('base64url')}Aa1!`;
+    const passwordHash = await bcrypt.hash(temporaryPassword, 12);
 
     const maxUsers = input.maxUsers || 10;
-    const maxStorageMb = BigInt(input.maxStorageMb || 10240);
 
-    const company = await this.prisma.company.create({
-      data: {
-        name: input.name,
-        code: input.code,
-        contactEmail: input.contactEmail,
-        contactPhone: input.contactPhone,
-        maxUsers,
-        maxStorageMb,
-        users: {
-          create: {
-            email: input.contactEmail,
-            username: input.code.toLowerCase(),
-            fullName: `${input.name} Admin`,
-            passwordHash,
-            role: 'COMPANY_ADMIN',
+    let company;
+    try {
+      company = await this.prisma.$transaction(async (tx) => {
+        const created = await tx.company.create({
+          data: {
+            name: input.name,
+            code: input.code,
+            contactEmail: input.contactEmail,
+            contactPhone: input.contactPhone,
+            maxUsers,
+            users: {
+              create: {
+                email: input.contactEmail,
+                username: input.code.toLowerCase(),
+                fullName: `${input.name} Admin`,
+                passwordHash,
+                role: 'COMPANY_ADMIN',
+              },
+            },
           },
-        },
-        subscriptions: {
-          create: {
-            plan: LicensePlan.ONE_YEAR,
-            status: SubscriptionStatus.ACTIVE,
-            startDate,
-            endDate,
-            maxEmployees: maxUsers,
-            maxDevices: maxUsers,
-            maxStorageMb,
+        });
+        await tx.auditLog.create({
+          data: {
+            companyId: created.id,
+            userId: createdByUserId,
+            action: 'COMPANY_CREATED',
+            entity: 'Company',
+            entityId: created.id,
+            details: { code: created.code },
           },
-        },
+        });
+        return created;
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new ConflictException('Company code, administrator username, or email already exists');
+      }
+      throw error;
+    }
+    return {
+      ...company,
+      maxStorageMb: Number(company.maxStorageMb),
+      adminCredentials: {
+        username: input.code.toLowerCase(),
+        temporaryPassword,
       },
-    });
-    return { ...company, maxStorageMb: Number(company.maxStorageMb) };
+    };
   }
 
   async getAllCompanies() {

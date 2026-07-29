@@ -5,6 +5,14 @@ interface ProfilePageProps {
   onLogout: () => void;
 }
 
+function maskedLicenseKey(value?: string) {
+  if (!value) return 'Protected';
+  const parts = value.split('-');
+  return parts.length >= 2
+    ? `${parts[0]}-****-****-****-${parts.at(-1)?.slice(-4) || '****'}`
+    : `****${value.slice(-4)}`;
+}
+
 export const ProfilePage: React.FC<ProfilePageProps> = ({ session, onLogout }) => {
   const user = session?.user || { fullName: 'Employee', username: '', email: '', role: 'EMPLOYEE' };
   const company = session?.company || { name: 'Unavailable', code: '—' };
@@ -40,7 +48,9 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ session, onLogout }) =
 
           <div className="bg-gray-50 border border-gray-200 p-3.5 rounded-md">
             <div className="text-xs text-gray-500 font-semibold uppercase mb-1">License Key</div>
-            <div className="text-sm font-mono font-bold text-green-800">{license.key}</div>
+            <div className="text-sm font-mono font-bold text-green-800">
+              {maskedLicenseKey(license.key)}
+            </div>
             <div className="text-xs text-green-700 font-semibold">Status: {license.status}</div>
           </div>
         </div>

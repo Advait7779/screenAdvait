@@ -21,7 +21,7 @@ export class SubscriptionService {
     });
     if (!company) throw new NotFoundException('Company not found');
 
-    const [employeeCount, allocation, storage] = await Promise.all([
+    const [employeeCount, allocation] = await Promise.all([
       this.prisma.user.count({
         where: { companyId: input.companyId, role: Role.EMPLOYEE },
       }),
@@ -29,14 +29,7 @@ export class SubscriptionService {
         where: { companyId: input.companyId, status: { not: LicenseStatus.REVOKED } },
         _sum: { maxDevices: true },
       }),
-      this.prisma.screenshot.aggregate({
-        where: { companyId: input.companyId },
-        _sum: { fileSize: true },
-      }),
     ]);
-    const usedStorageMb = Math.ceil(
-      Number(storage._sum.fileSize || BigInt(0)) / 1024 / 1024,
-    );
     if (input.maxEmployees < employeeCount) {
       throw new BadRequestException(
         `Employee limit cannot be below current usage (${employeeCount})`,
@@ -51,13 +44,9 @@ export class SubscriptionService {
       where: { companyId: input.companyId },
       orderBy: [{ createdAt: 'desc' }, { startDate: 'desc' }],
     });
-    const effectiveStorageMb = input.maxStorageMb
-      ?? Number(current?.maxStorageMb ?? company.maxStorageMb ?? BigInt(51200));
-    if (effectiveStorageMb < usedStorageMb) {
-      throw new BadRequestException(
-        `Storage limit cannot be below current usage (${usedStorageMb} MB)`,
-      );
-    }
+    const effectiveStorageMb = Number(
+      current?.maxStorageMb ?? company.maxStorageMb ?? BigInt(51200),
+    );
     const startDate = new Date();
     // Editing quotas or plan labels must not silently grant a fresh term.
     // Renewal is a separate, audited action.
@@ -70,7 +59,11 @@ export class SubscriptionService {
             where: { id: current.id },
             data: {
               plan: input.plan,
-              status: SubscriptionStatus.ACTIVE,
+              status:
+                current.status === SubscriptionStatus.ACTIVE &&
+                current.endDate.getTime() <= Date.now()
+                  ? SubscriptionStatus.EXPIRED
+                  : current.status,
               endDate,
               maxEmployees: input.maxEmployees,
               maxDevices: input.maxDevices,
@@ -126,7 +119,7 @@ export class SubscriptionService {
             endDate: endDate.toISOString(),
             maxEmployees: input.maxEmployees,
             maxDevices: input.maxDevices,
-            maxStorageMb: input.maxStorageMb,
+            maxStorageMb: effectiveStorageMb,
           },
         },
       });

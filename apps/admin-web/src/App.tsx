@@ -7,6 +7,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Check,
+  Copy,
   KeyRound,
   PauseCircle,
   PlayCircle,
@@ -24,7 +25,7 @@ import { ToastContainer, ToastMessage } from './ToastContainer';
 
 const API_URL =
   import.meta.env.VITE_API_URL ||
-  `http://${window.location.hostname || 'localhost'}:5000/api/v1`;
+  `${window.location.origin}/api/v1`;
 const auth = (token: string | null) => ({ headers: { Authorization: `Bearer ${token}` } });
 const formatDate = (value?: string) => (value ? new Date(value).toLocaleDateString() : '—');
 
@@ -168,6 +169,11 @@ export function App() {
   const [msg, setMsg] = useState('');
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [logoutConfirmationOpen, setLogoutConfirmationOpen] = useState(false);
+  const [newCompanyCredentials, setNewCompanyCredentials] = useState<{
+    companyName: string;
+    username: string;
+    temporaryPassword: string;
+  } | null>(null);
   const [planMenuOpen, setPlanMenuOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [form, setForm] = useState<{
@@ -175,13 +181,11 @@ export function App() {
     plan: string;
     maxEmployees: number | string;
     maxDevices: number | string;
-    maxStorageMb: number;
   }>({
     companyName: '',
     plan: 'MONTHLY',
     maxEmployees: 25,
     maxDevices: 25,
-    maxStorageMb: 51200,
   });
 
   // Subscriptions Table Pagination
@@ -237,7 +241,6 @@ export function App() {
       setForm((current) => ({
         ...current,
         companyName: current.companyName || companyRes.data[0]?.name || '',
-        maxStorageMb: current.maxStorageMb || Number(subscriptionRes.data[0]?.maxStorageMb || 51200),
       }));
       if (isManual) addToast('Platform data refreshed.', 'info');
     } catch (err: any) {
@@ -289,22 +292,32 @@ export function App() {
         (item) => item.name.trim().toLowerCase() === trimmedName.toLowerCase(),
       );
       if (!company) {
-        const sanitizedCode = trimmedName
+        const baseCode = trimmedName
           .toUpperCase()
           .replace(/[^A-Z0-9]/g, '')
-          .slice(0, 10) || `COMP${Date.now().toString().slice(-4)}`;
+          .slice(0, 6) || 'COMP';
+        const uniqueSuffix = `${Date.now().toString(36).slice(-4)}${Math.random()
+          .toString(36)
+          .slice(2, 4)}`.toUpperCase();
+        const sanitizedCode = `${baseCode}${uniqueSuffix}`.slice(0, 12);
         const newCompRes = await axios.post(
           `${API_URL}/companies`,
           {
             name: trimmedName,
-            code: sanitizedCode.length >= 2 ? sanitizedCode : `COMP${Date.now().toString().slice(-4)}`,
-            contactEmail: `admin@${sanitizedCode.toLowerCase()}.com`,
+            code: sanitizedCode,
+            contactEmail: `admin+${sanitizedCode.toLowerCase()}@screenadvait.example`,
             maxUsers: maxUsersNum,
-            maxStorageMb: form.maxStorageMb,
           },
           auth(token),
         );
         company = newCompRes.data;
+        if (company.adminCredentials) {
+          setNewCompanyCredentials({
+            companyName: company.name,
+            username: company.adminCredentials.username,
+            temporaryPassword: company.adminCredentials.temporaryPassword,
+          });
+        }
       }
       await axios.post(
         `${API_URL}/subscriptions`,
@@ -396,8 +409,11 @@ export function App() {
     }
   };
 
-  const performLogout = () => {
+  const performLogout = async () => {
     setLogoutConfirmationOpen(false);
+    if (token) {
+      await axios.post(`${API_URL}/auth/logout`, {}, auth(token)).catch(() => undefined);
+    }
     logout(true);
   };
 
@@ -776,6 +792,49 @@ export function App() {
                 <p className="mt-2.5 text-[11px] font-normal text-gray-400 truncate">
                   Existing: {companies.map((c) => c.name).join(', ') || 'None'}
                 </p>
+                {newCompanyCredentials && (
+                  <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-4 text-xs text-amber-950">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <div className="font-bold">Company administrator credentials — shown once</div>
+                        <p className="mt-1 text-[11px] text-amber-800">
+                          Copy these credentials now and send them securely to {newCompanyCredentials.companyName}.
+                          The temporary password is never stored in readable form.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setNewCompanyCredentials(null)}
+                        className="rounded-md border border-amber-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-amber-900 hover:bg-amber-100"
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                      {[
+                        ['Username', newCompanyCredentials.username],
+                        ['Temporary password', newCompanyCredentials.temporaryPassword],
+                      ].map(([label, value]) => (
+                        <button
+                          key={label}
+                          type="button"
+                          onClick={() => {
+                            void navigator.clipboard?.writeText(value);
+                            addToast(`${label} copied.`, 'info');
+                          }}
+                          className="flex min-w-0 items-center justify-between gap-3 rounded-md border border-amber-200 bg-white px-3 py-2 text-left hover:border-amber-400"
+                          title={`Copy ${label.toLowerCase()}`}
+                        >
+                          <span className="min-w-0">
+                            <span className="block text-[10px] font-semibold uppercase tracking-wide text-amber-700">{label}</span>
+                            <span className="block truncate font-mono text-xs font-bold text-gray-900">{value}</span>
+                          </span>
+                          <Copy className="h-3.5 w-3.5 shrink-0 text-amber-700" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -848,7 +907,6 @@ export function App() {
                               <th className="px-3 py-3">Plan / Expiry</th>
                               <th className="px-3 py-3">Employees</th>
                               <th className="px-3 py-3">Devices</th>
-                              <th className="px-3 py-3">Storage</th>
                               <th className="px-3 py-3">Status</th>
                               <th className="px-3 py-3">Actions</th>
                             </tr>
@@ -868,7 +926,6 @@ export function App() {
                                 </td>
                                 <td className="px-3 py-3 text-gray-600">{item.usage?.employees || 0} / {item.maxEmployees}</td>
                                 <td className="px-3 py-3 text-gray-600">{item.usage?.allocatedDeviceSlots || 0} / {item.maxDevices}</td>
-                                <td className="px-3 py-3 text-gray-600">{(item.usage?.storageMb || 0).toFixed(1)} / {(item.maxStorageMb / 1024).toFixed(1)} GB</td>
                                 <td className="px-3 py-3">
                                   <span className={`px-2 py-1 rounded-full text-[11px] font-semibold border ${item.status === 'ACTIVE' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
                                     {item.status}

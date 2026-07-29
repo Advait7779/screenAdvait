@@ -27,13 +27,25 @@ export const RefreshTokenSchema = z.object({
 
 export type RefreshTokenInput = z.infer<typeof RefreshTokenSchema>;
 
+export const ChangePasswordSchema = z.object({
+  currentPassword: z.string().min(6),
+  newPassword: z
+    .string()
+    .min(12, 'New password must be at least 12 characters')
+    .regex(/[a-z]/, 'New password must contain a lowercase letter')
+    .regex(/[A-Z]/, 'New password must contain an uppercase letter')
+    .regex(/\d/, 'New password must contain a number')
+    .regex(/[^A-Za-z0-9]/, 'New password must contain a symbol'),
+});
+
+export type ChangePasswordInput = z.infer<typeof ChangePasswordSchema>;
+
 export const CreateCompanySchema = z.object({
   name: z.string().min(2, 'Company name required'),
   code: z.string().min(2, 'Company code required').toUpperCase(),
   contactEmail: z.string().email('Invalid email address'),
   contactPhone: z.string().optional(),
   maxUsers: z.number().int().positive().default(10),
-  maxStorageMb: z.number().int().positive().default(10240),
 });
 
 export type CreateCompanyInput = z.infer<typeof CreateCompanySchema>;
@@ -52,11 +64,19 @@ export type CreateUserInput = z.infer<typeof CreateUserSchema>;
 export const CreateManagedEmployeeSchema = z.object({
   email: z.string().email('Invalid email address'),
   username: z.string().min(3, 'Username must be at least 3 characters'),
-  password: z.string().min(10, 'Temporary password must be at least 10 characters'),
+  password: ChangePasswordSchema.shape.newPassword,
   fullName: z.string().min(2, 'Full name required'),
 });
 
 export type CreateManagedEmployeeInput = z.infer<typeof CreateManagedEmployeeSchema>;
+
+export const EmployeeStatusSchema = z.object({
+  isActive: z.boolean(),
+});
+
+export const ResetEmployeePasswordSchema = z.object({
+  newPassword: ChangePasswordSchema.shape.newPassword,
+});
 
 export const CreateEmployeeLicenseSchema = z.object({
   maxDevices: z.number().int().min(1).max(20).default(1),
@@ -79,7 +99,6 @@ export const UpsertCompanySubscriptionSchema = z.object({
   plan: z.nativeEnum(LicensePlan).default(LicensePlan.MONTHLY),
   maxEmployees: z.number().int().min(1).max(10000),
   maxDevices: z.number().int().min(1).max(50000),
-  maxStorageMb: z.number().int().min(100).max(100_000_000).optional(),
   customExpiryDays: z.number().int().min(1).max(36500).optional(),
 });
 
@@ -106,4 +125,6 @@ export const VerifyLicenseSchema = z.object({
 export const ScreenshotUploadMetadataSchema = z.object({
   deviceId: z.string().min(8),
   capturedAt: z.string().datetime(),
+  idempotencyKey: z.string().min(16).max(200),
+  timezoneOffsetMinutes: z.coerce.number().int().min(-840).max(840),
 });

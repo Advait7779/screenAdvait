@@ -17,19 +17,29 @@ export class GoogleDriveService {
     process.env.LOCAL_STORAGE_PATH || path.join(process.cwd(), 'storage'),
   );
   private driveClient: ReturnType<typeof google.drive> | null = null;
+  private driveRootFolderId: string | null = null;
 
   constructor() {
     this.initDriveClient();
   }
 
   private initDriveClient() {
+    const provider = (process.env.STORAGE_PROVIDER || 'local').trim().toLowerCase();
+    if (provider === 'local') {
+      this.logger.log(`Drive for Desktop/local storage is active at ${this.localRoot}`);
+      return;
+    }
+    if (provider !== 'google-drive') {
+      throw new Error('STORAGE_PROVIDER must be either "local" or "google-drive"');
+    }
     const clientId = process.env.GOOGLE_DRIVE_CLIENT_ID;
     const clientSecret = process.env.GOOGLE_DRIVE_CLIENT_SECRET;
     const refreshToken = process.env.GOOGLE_DRIVE_REFRESH_TOKEN;
 
     if (!clientId || !clientSecret || !refreshToken || clientId.startsWith('mock-')) {
-      this.logger.warn('Google Drive API is not configured; Drive for Desktop storage is active');
-      return;
+      throw new Error(
+        'Google Drive API storage requires GOOGLE_DRIVE_CLIENT_ID, GOOGLE_DRIVE_CLIENT_SECRET and GOOGLE_DRIVE_REFRESH_TOKEN',
+      );
     }
 
     const oauth2Client = new google.auth.OAuth2(
@@ -69,7 +79,7 @@ export class GoogleDriveService {
     }
 
     try {
-      let parentId: string | undefined;
+      let parentId: string | undefined = await this.getDriveRootFolderId();
       for (const segment of segments) {
         parentId = await this.ensureDriveFolder(segment, parentId);
       }
@@ -110,13 +120,33 @@ export class GoogleDriveService {
       return;
     }
     if (this.driveClient) {
-      const metadata = await this.driveClient.files.get({
-        fileId,
-        fields: 'parents',
-      });
-      await this.driveClient.files.delete({ fileId });
+      let metadata;
+      try {
+        metadata = await this.driveClient.files.get({
+          fileId,
+          fields: 'parents',
+        });
+      } catch (error) {
+        if (this.isNotFound(error)) return;
+        throw error;
+      }
+      try {
+        await this.driveClient.files.delete({ fileId });
+      } catch (error) {
+        if (!this.isNotFound(error)) throw error;
+      }
       await this.pruneEmptyDriveParents(metadata.data.parents || [], 4);
     }
+  }
+
+  async checkHealth() {
+    if (!this.driveClient) {
+      await fs.mkdir(this.localRoot, { recursive: true });
+      await fs.access(this.localRoot);
+      return { provider: 'local', ready: true };
+    }
+    await this.driveClient.files.list({ pageSize: 1, fields: 'files(id)' });
+    return { provider: 'google-drive', ready: true };
   }
 
   private async pruneEmptyLocalParents(startDirectory: string, maximumLevels: number) {
@@ -139,6 +169,7 @@ export class GoogleDriveService {
     for (let level = 0; level < maximumLevels && currentParents.length > 0; level += 1) {
       const nextParents: string[] = [];
       for (const folderId of currentParents) {
+        if (folderId === this.driveRootFolderId) continue;
         const children = await this.driveClient!.files.list({
           q: `'${folderId}' in parents and trashed=false`,
           fields: 'files(id)',
@@ -179,6 +210,16 @@ export class GoogleDriveService {
     return created.data.id;
   }
 
+  private async getDriveRootFolderId() {
+    if (this.driveRootFolderId) return this.driveRootFolderId;
+    const configuredId = process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID?.trim();
+    this.driveRootFolderId = configuredId
+      || await this.ensureDriveFolder(
+        process.env.GOOGLE_DRIVE_ROOT_FOLDER_NAME?.trim() || 'ScreenAdvait Screenshots',
+      );
+    return this.driveRootFolderId;
+  }
+
   private resolveLocalFile(fileId: string) {
     const relative = fileId.slice('local:'.length);
     const absolute = path.resolve(this.localRoot, relative);
@@ -186,6 +227,10 @@ export class GoogleDriveService {
       throw new Error('Invalid local storage file ID');
     }
     return absolute;
+  }
+
+  private isNotFound(error: unknown) {
+    return Number((error as any)?.response?.status || (error as any)?.code) === 404;
   }
 
   public safeSegment(value: string) {
@@ -197,7 +242,15 @@ export class GoogleDriveService {
   }
 
   async migrateLegacyStorage(prisma: any) {
+    const migrationLockId = BigInt('721420260730');
+    let acquired = false;
     try {
+      const lock = await prisma.$queryRaw`
+        SELECT pg_try_advisory_lock(${migrationLockId}) AS acquired
+      `;
+      acquired = Boolean(lock[0]?.acquired);
+      if (!acquired) return;
+
       const screenshots = await prisma.screenshot.findMany({
         include: { company: true, user: true },
       });
@@ -209,13 +262,20 @@ export class GoogleDriveService {
         const currentRelative = screenshot.fileKey.slice('local:'.length);
         const fileName = path.basename(currentRelative);
 
-        const capturedDate = new Date(screenshot.capturedAt);
-        const day = String(capturedDate.getDate()).padStart(2, '0');
-        const month = String(capturedDate.getMonth() + 1).padStart(2, '0');
-        const year = capturedDate.getFullYear();
+        const capturedDate = new Date(
+          new Date(screenshot.capturedAt).getTime()
+            + Number(screenshot.timezoneOffsetMinutes || 0) * 60_000,
+        );
+        const day = String(capturedDate.getUTCDate()).padStart(2, '0');
+        const month = String(capturedDate.getUTCMonth() + 1).padStart(2, '0');
+        const year = capturedDate.getUTCFullYear();
         const formattedDate = `${day}-${month}-${year}`;
 
-        const companyFolder = this.safeSegment(screenshot.company?.name || 'Company');
+        const companyFolder = this.safeSegment(
+          screenshot.company
+            ? `${screenshot.company.code}-${screenshot.company.id.slice(0, 8)}`
+            : 'Company',
+        );
         const userFolder = this.safeSegment(screenshot.user?.username || 'employee');
         const targetRelative = `${companyFolder}/${formattedDate}/${userFolder}/${fileName}`;
 
@@ -262,6 +322,14 @@ export class GoogleDriveService {
       }
     } catch (error) {
       this.logger.error('Legacy storage migration error', error);
+    } finally {
+      if (acquired) {
+        await prisma.$queryRaw`
+          SELECT pg_advisory_unlock(${migrationLockId})
+        `.catch((error: unknown) => {
+          this.logger.error('Could not release legacy storage migration lock', error);
+        });
+      }
     }
   }
 }

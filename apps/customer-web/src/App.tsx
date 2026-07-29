@@ -27,7 +27,7 @@ import { ToastContainer, ToastMessage } from './ToastContainer';
 
 const API_URL =
   import.meta.env.VITE_API_URL ||
-  `http://${window.location.hostname || 'localhost'}:5000/api/v1`;
+  `${window.location.origin}/api/v1`;
 const DESKTOP_DOWNLOAD_URL = import.meta.env.VITE_DESKTOP_DOWNLOAD_URL || '';
 const auth = (token: string | null) => ({ headers: { Authorization: `Bearer ${token}` } });
 
@@ -325,8 +325,11 @@ export function App() {
     }
   };
 
-  const performLogout = () => {
+  const performLogout = async () => {
     setLogoutConfirmationOpen(false);
+    if (token) {
+      await axios.post(`${API_URL}/auth/logout`, {}, auth(token)).catch(() => undefined);
+    }
     logout(true);
   };
 

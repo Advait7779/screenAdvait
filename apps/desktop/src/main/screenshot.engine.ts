@@ -1,7 +1,6 @@
-import desktopScreenshot from 'screenshot-desktop';
 import path from 'path';
 import fs from 'fs';
-import { app, Notification } from 'electron';
+import { app, desktopCapturer, Notification, screen } from 'electron';
 import axios from 'axios';
 import FormData from 'form-data';
 import crypto from 'crypto';
@@ -29,7 +28,31 @@ let entitlementError = '';
 let lastEntitlementCheck = 0;
 let entitlementPaused = false;
 
-const ALLOWED_INTERVALS = new Set([10, 30, 60, 300, 600, 900, 1800, 3600]);
+const ALLOWED_INTERVALS = new Set([60, 300, 600, 900, 1800, 3600]);
+
+async function capturePrimaryDisplayPng() {
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const width = Math.max(
+    1,
+    Math.round(primaryDisplay.size.width * primaryDisplay.scaleFactor),
+  );
+  const height = Math.max(
+    1,
+    Math.round(primaryDisplay.size.height * primaryDisplay.scaleFactor),
+  );
+  const sources = await desktopCapturer.getSources({
+    types: ['screen'],
+    thumbnailSize: { width, height },
+    fetchWindowIcons: false,
+  });
+  const source =
+    sources.find((candidate) => candidate.display_id === String(primaryDisplay.id)) ||
+    sources[0];
+  if (!source || source.thumbnail.isEmpty()) {
+    throw new Error('Windows did not return a desktop capture source');
+  }
+  return source.thumbnail.toPNG();
+}
 
 function safeEmployeeFolder(value: unknown) {
   const cleaned = String(value || 'employee')
@@ -170,7 +193,8 @@ export async function captureDesktopNow(): Promise<{
 
     const fileName = `${now.toISOString().replace(/[-:T.Z]/g, '')}-${crypto.randomBytes(3).toString('hex')}.png`;
     const filePath = path.join(storageDir, fileName);
-    await desktopScreenshot({ filename: filePath, format: 'png' });
+    const png = await capturePrimaryDisplayPng();
+    await fs.promises.writeFile(filePath, png, { flag: 'wx' });
     const stats = fs.statSync(filePath);
     const queueId = `queue_${crypto.randomUUID()}`;
     getDb()
@@ -293,6 +317,11 @@ async function upload(item: any, token: string) {
   });
   form.append('deviceId', getDeviceDetails().deviceId);
   form.append('capturedAt', item.captured_at);
+  form.append('idempotencyKey', item.id);
+  form.append(
+    'timezoneOffsetMinutes',
+    String(-new Date(item.captured_at).getTimezoneOffset()),
+  );
   return axios.post(`${getApiUrl()}/screenshots/upload`, form, {
     headers: { ...form.getHeaders(), Authorization: `Bearer ${token}` },
     timeout: 30_000,

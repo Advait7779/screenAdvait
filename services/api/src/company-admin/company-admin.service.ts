@@ -80,12 +80,26 @@ export class CompanyAdminService {
     input: CreateManagedEmployeeInput,
   ) {
     const subscription = await this.entitlements.assertCompanyActive(companyId);
-    const currentEmployees = await this.prisma.user.count({
-      where: { companyId, role: Role.EMPLOYEE },
-    });
+    const [currentEmployees, allocation] = await Promise.all([
+      this.prisma.user.count({
+        where: { companyId, role: Role.EMPLOYEE },
+      }),
+      this.prisma.license.aggregate({
+        where: {
+          subscriptionId: subscription.id,
+          status: { not: LicenseStatus.REVOKED },
+        },
+        _sum: { maxDevices: true },
+      }),
+    ]);
     if (currentEmployees >= subscription.maxEmployees) {
       throw new ForbiddenException(
         `Employee limit reached (${subscription.maxEmployees})`,
+      );
+    }
+    if ((allocation._sum.maxDevices || 0) + 1 > subscription.maxDevices) {
+      throw new ForbiddenException(
+        `Company device allocation limit reached (${subscription.maxDevices})`,
       );
     }
     const existing = await this.prisma.user.findFirst({
@@ -216,6 +230,76 @@ export class CompanyAdminService {
       return created;
     });
     return license;
+  }
+
+  async setEmployeeStatus(
+    companyId: string,
+    adminUserId: string,
+    employeeId: string,
+    isActive: boolean,
+  ) {
+    const employee = await this.prisma.user.findFirst({
+      where: { id: employeeId, companyId, role: Role.EMPLOYEE },
+    });
+    if (!employee) throw new NotFoundException('Employee not found');
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: employeeId },
+        data: { isActive, tokenVersion: { increment: 1 } },
+      });
+      if (!isActive) {
+        const licenses = await tx.license.findMany({
+          where: { userId: employeeId, companyId },
+          select: { id: true },
+        });
+        const licenseIds = licenses.map((license) => license.id);
+        await tx.device.deleteMany({ where: { licenseId: { in: licenseIds } } });
+        await tx.license.updateMany({
+          where: { id: { in: licenseIds }, status: { not: LicenseStatus.REVOKED } },
+          data: { status: LicenseStatus.SUSPENDED, currentDevices: 0 },
+        });
+      }
+      await tx.auditLog.create({
+        data: {
+          companyId,
+          userId: adminUserId,
+          action: isActive ? 'EMPLOYEE_ENABLED' : 'EMPLOYEE_DISABLED',
+          entity: 'User',
+          entityId: employeeId,
+        },
+      });
+    });
+    return { success: true };
+  }
+
+  async resetEmployeePassword(
+    companyId: string,
+    adminUserId: string,
+    employeeId: string,
+    newPassword: string,
+  ) {
+    const employee = await this.prisma.user.findFirst({
+      where: { id: employeeId, companyId, role: Role.EMPLOYEE },
+    });
+    if (!employee) throw new NotFoundException('Employee not found');
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: employeeId },
+        data: { passwordHash, tokenVersion: { increment: 1 } },
+      }),
+      this.prisma.auditLog.create({
+        data: {
+          companyId,
+          userId: adminUserId,
+          action: 'EMPLOYEE_PASSWORD_RESET',
+          entity: 'User',
+          entityId: employeeId,
+        },
+      }),
+    ]);
+    return { success: true };
   }
 
   async resetDevices(

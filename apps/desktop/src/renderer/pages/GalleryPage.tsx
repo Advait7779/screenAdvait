@@ -6,6 +6,7 @@ import {
   ChevronRight,
   Check,
   Clock,
+  CloudOff,
   Folder,
   FolderOpen,
   HardDrive,
@@ -304,15 +305,21 @@ export const GalleryPage: React.FC = () => {
                                     item.status === 'COMPLETED'
                                       ? 'bg-green-600 border-green-700 text-white'
                                       : item.status === 'FAILED'
-                                        ? 'bg-red-600 border-red-700 text-white'
+                                        ? 'bg-amber-500 border-amber-600 text-white'
                                         : 'bg-amber-500 border-amber-600 text-white'
                                   }`}
-                                  title={item.status}
+                                  title={
+                                    item.status === 'COMPLETED'
+                                      ? 'Saved locally and uploaded'
+                                      : item.status === 'FAILED'
+                                        ? `Saved locally; cloud upload will retry${item.error_message ? `: ${item.error_message}` : ''}`
+                                        : 'Saved locally; waiting to upload'
+                                  }
                                 >
                                   {item.status === 'COMPLETED' ? (
                                     <Check className="h-2.5 w-2.5 stroke-[3]" />
                                   ) : item.status === 'FAILED' ? (
-                                    <X className="h-2.5 w-2.5 stroke-[3]" />
+                                    <CloudOff className="h-2.5 w-2.5 stroke-[2.5]" />
                                   ) : (
                                     <Clock className="h-2.5 w-2.5 stroke-[2.5]" />
                                   )}

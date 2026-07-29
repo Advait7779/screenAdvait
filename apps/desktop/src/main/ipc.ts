@@ -42,6 +42,20 @@ export function getApiUrl(): string {
   return process.env.SCREENADVAIT_API_URL || 'http://localhost:5000/api/v1';
 }
 
+function isAllowedServerUrl(value: string) {
+  const url = new URL(value);
+  if (url.protocol === 'https:') return true;
+  if (url.protocol !== 'http:') return false;
+  if (process.env.SCREENADVAIT_ALLOW_INSECURE_HTTP === 'true') return true;
+  return (
+    url.hostname === 'localhost' ||
+    url.hostname === '127.0.0.1' ||
+    /^10\./.test(url.hostname) ||
+    /^192\.168\./.test(url.hostname) ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(url.hostname)
+  );
+}
+
 const SETTINGS = new Set([
   'screenshotInterval',
   'imageFormat',
@@ -76,7 +90,7 @@ export function registerIpcHandlers() {
 
     let formatted = trimmed.replace(/\/+$/, '');
     if (!/^https?:\/\//i.test(formatted)) {
-      formatted = `http://${formatted}`;
+      formatted = `https://${formatted}`;
     }
     let targetApiUrl = formatted;
     if (!targetApiUrl.endsWith('/api/v1')) {
@@ -85,6 +99,18 @@ export function registerIpcHandlers() {
       } else {
         targetApiUrl = `${targetApiUrl}/api/v1`;
       }
+    }
+
+    try {
+      if (!isAllowedServerUrl(targetApiUrl)) {
+        return {
+          success: false,
+          apiUrl: targetApiUrl,
+          error: 'Public servers must use HTTPS. HTTP is allowed only for localhost or private LAN testing.',
+        };
+      }
+    } catch {
+      return { success: false, apiUrl: targetApiUrl, error: 'Enter a valid server URL.' };
     }
 
     try {
@@ -173,6 +199,18 @@ export function registerIpcHandlers() {
     if (session?.user?.username && session?.licenseStatus?.key) {
       rememberLicense(session.user.username, session.licenseStatus.key);
     }
+    if (session?.accessToken) {
+      await axios
+        .post(
+          `${getApiUrl()}/auth/logout`,
+          {},
+          {
+            headers: { Authorization: `Bearer ${session.accessToken}` },
+            timeout: 5_000,
+          },
+        )
+        .catch(() => undefined);
+    }
     clearSession();
     stopScreenshotEngine();
     return { success: true };
@@ -199,7 +237,7 @@ export function registerIpcHandlers() {
     const statement = db.prepare('INSERT OR REPLACE INTO local_settings (key, value) VALUES (?, ?)');
     for (const [key, value] of Object.entries(settings)) {
       if (!SETTINGS.has(key)) continue;
-      if (key === 'screenshotInterval' && ![10, 30, 60, 300, 600, 900, 1800, 3600].includes(Number(value))) {
+      if (key === 'screenshotInterval' && ![60, 300, 600, 900, 1800, 3600].includes(Number(value))) {
         throw new Error('Unsupported screenshot interval');
       }
       if (key === 'imageFormat' && value !== 'PNG') throw new Error('Only PNG capture is supported');
@@ -226,9 +264,10 @@ export function registerIpcHandlers() {
   });
 
   secureHandle(IPC_CHANNELS.GET_GALLERY_SCREENSHOTS, async () => {
+    const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60_000).toISOString();
     const rows = db
-      .prepare('SELECT * FROM upload_queue ORDER BY captured_at DESC LIMIT 2000')
-      .all() as any[];
+      .prepare('SELECT * FROM upload_queue WHERE captured_at >= ? ORDER BY captured_at DESC')
+      .all(cutoff) as any[];
     return rows.map(({ file_path: _filePath, ...row }) => row);
   });
 
@@ -277,10 +316,15 @@ export function registerIpcHandlers() {
   });
   secureHandle(IPC_CHANNELS.VERIFY_LICENSE, async (key: string) => {
     const device = getDeviceDetails();
+    const session = getSession();
+    if (!session?.accessToken) return { valid: false, message: 'Sign in before verifying a license' };
     const response = await axios.post(`${getApiUrl()}/licenses/verify`, {
       licenseKey: key,
       deviceId: device.deviceId,
       machineGuid: device.machineGuid,
+    }, {
+      headers: { Authorization: `Bearer ${session.accessToken}` },
+      timeout: 10_000,
     });
     return response.data;
   });

@@ -1,4 +1,5 @@
-import { Controller, Post, Body, Req, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Body, Req, HttpCode, HttpStatus, UseGuards } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from './auth.service.js';
 import {
   LoginInput,
@@ -7,6 +8,8 @@ import {
   PortalLoginSchema,
   RefreshTokenInput,
   RefreshTokenSchema,
+  ChangePasswordInput,
+  ChangePasswordSchema,
 } from '@screenadvait/shared-utils';
 import { Request } from 'express';
 import { ZodValidationPipe } from '../common/zod-validation.pipe.js';
@@ -45,5 +48,22 @@ export class AuthController {
     @Body(new ZodValidationPipe(RefreshTokenSchema)) body: RefreshTokenInput,
   ) {
     return this.authService.refresh(body.refreshToken);
+  }
+
+  @Post('change-password')
+  @UseGuards(AuthGuard('jwt'))
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async changePassword(
+    @Body(new ZodValidationPipe(ChangePasswordSchema)) body: ChangePasswordInput,
+    @Req() req: any,
+  ) {
+    await this.authService.changePassword(req.user.id, body);
+  }
+
+  @Post('logout')
+  @UseGuards(AuthGuard('jwt'))
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async logout(@Req() req: any) {
+    await this.authService.logout(req.user.id);
   }
 }

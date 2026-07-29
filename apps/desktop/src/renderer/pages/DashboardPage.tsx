@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
 import { Camera, CloudUpload, Clock, HardDrive, CheckCircle2, RefreshCw, Timer, Pause, Play } from 'lucide-react';
 
 interface DashboardPageProps {
   session: any;
   addToast?: (text: string, type?: 'success' | 'error' | 'info') => void;
+  onNavigate?: (path: '/gallery') => void;
 }
 
 let cachedQueueStatus: any = { pendingCount: 0, completedCount: 0, failedCount: 0, todayCount: 0, storageBytes: 0, recentQueue: [] };
@@ -23,7 +23,7 @@ function calculateCountdownText(engineStatus: any): string {
   return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 }
 
-export const DashboardPage: React.FC<DashboardPageProps> = ({ session, addToast }) => {
+export const DashboardPage: React.FC<DashboardPageProps> = ({ session, addToast, onNavigate }) => {
   const [queueStatus, setQueueStatus] = useState<any>(cachedQueueStatus);
   const [engineStatus, setEngineStatus] = useState<any>(cachedEngineStatus);
   const [countdownText, setCountdownText] = useState<string>(() => calculateCountdownText(cachedEngineStatus));
@@ -235,9 +235,13 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ session, addToast 
       <div className="bg-white border border-gray-200 rounded-md p-5 shadow-sm flex-1 min-h-0 flex flex-col overflow-hidden">
         <div className="flex items-center justify-between mb-3 shrink-0">
           <h3 className="text-base font-bold text-gray-900">Recent Desktop Screenshots</h3>
-          <Link to="/gallery" className="text-xs font-semibold text-green-800 hover:text-green-950">
+          <button
+            type="button"
+            onClick={() => onNavigate?.('/gallery')}
+            className="text-xs font-semibold text-green-800 hover:text-green-950"
+          >
             View the full day in Gallery →
-          </Link>
+          </button>
         </div>
         {queueStatus.recentQueue && queueStatus.recentQueue.length > 0 ? (
           <div ref={recentListRef} className="divide-y divide-gray-100 flex-1 min-h-0 overflow-hidden">

@@ -11,7 +11,12 @@ export class LicenseService {
     private readonly entitlements: EntitlementService,
   ) {}
 
-  async verifyLicense(key: string, deviceId: string, machineGuid: string) {
+  async verifyLicense(
+    key: string,
+    deviceId: string,
+    machineGuid: string,
+    authenticatedLicenseId?: string,
+  ) {
     const license = await this.prisma.license.findUnique({
       where: { key: key.toUpperCase() },
       include: { company: true },
@@ -19,6 +24,9 @@ export class LicenseService {
 
     if (!license) {
       return { valid: false, message: 'License key not found' };
+    }
+    if (!authenticatedLicenseId || authenticatedLicenseId !== license.id) {
+      return { valid: false, message: 'License does not belong to this authenticated session' };
     }
 
     const now = new Date();
@@ -36,22 +44,6 @@ export class LicenseService {
     let device = await this.prisma.device.findUnique({
       where: { deviceId },
     });
-
-    if (!device && entitlement.active) {
-      const count = await this.prisma.device.count({ where: { licenseId: license.id } });
-      if (count < license.maxDevices && license.userId) {
-        device = await this.prisma.device.create({
-          data: {
-            userId: license.userId,
-            licenseId: license.id,
-            deviceId,
-            machineGuid,
-            os: 'Windows',
-            computerName: 'WORKSTATION',
-          },
-        });
-      }
-    }
 
     if (
       !device ||

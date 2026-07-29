@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards, Req } from '@nestjs/common';
 import { CompanyService } from './company.service.js';
 import { AuthGuard } from '@nestjs/passport';
 import { CreateCompanyInput, CreateCompanySchema } from '@screenadvait/shared-utils';
@@ -21,7 +21,8 @@ export class CompanyController {
   @Post()
   async createCompany(
     @Body(new ZodValidationPipe(CreateCompanySchema)) body: CreateCompanyInput,
+    @Req() req: any,
   ) {
-    return this.companyService.createCompany(body);
+    return this.companyService.createCompany(body, req.user.id);
   }
 }

@@ -26,9 +26,26 @@ import { ToastContainer, ToastMessage } from './ToastContainer';
 
 const API_URL =
   import.meta.env.VITE_API_URL ||
-  `http://${window.location.hostname || 'localhost'}:5000/api/v1`;
+  `${window.location.origin}/api/v1`;
 const DESKTOP_DOWNLOAD_URL = import.meta.env.VITE_DESKTOP_DOWNLOAD_URL || '';
 const auth = (token: string) => ({ headers: { Authorization: `Bearer ${token}` } });
+
+async function fetchAllCompanyScreenshots(token: string) {
+  const items: any[] = [];
+  let cursor: string | null = null;
+  for (let page = 0; page < 100; page += 1) {
+    const response: any = await axios.get(`${API_URL}/screenshots/company`, {
+      ...auth(token),
+      params: { limit: 1000, ...(cursor ? { cursor } : {}) },
+    });
+    if (Array.isArray(response.data)) return response.data;
+    const pageItems = Array.isArray(response.data?.items) ? response.data.items : [];
+    items.push(...pageItems);
+    cursor = response.data?.nextCursor || null;
+    if (!cursor) return items;
+  }
+  throw new Error('The screenshot archive is too large to load safely. Narrow the retention period.');
+}
 
 function apiErrorMessage(error: any, fallback: string) {
   const details = error.response?.data?.errors;
@@ -66,6 +83,16 @@ function fileSizeLabel(value: number | string | undefined) {
   return bytes < 1024 * 1024
     ? `${(bytes / 1024).toFixed(1)} KB`
     : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function isStrongPassword(value: string) {
+  return (
+    value.length >= 12 &&
+    /[a-z]/.test(value) &&
+    /[A-Z]/.test(value) &&
+    /\d/.test(value) &&
+    /[^A-Za-z0-9]/.test(value)
+  );
 }
 
 // ── SVG icons for sidebar nav ─────────────────────────────────────────────────
@@ -127,16 +154,6 @@ function KpiIconEmployees() {
     </svg>
   );
 }
-function KpiIconStorage() {
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ea580c" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <ellipse cx="12" cy="5" rx="9" ry="3"/>
-      <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
-      <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
-    </svg>
-  );
-}
-
 interface CustomerDashboardProps {
   token: string;
   session: any;
@@ -186,6 +203,8 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
     email: '',
     password: '',
   });
+  const [passwordResetTarget, setPasswordResetTarget] = useState<any>(null);
+  const [replacementPassword, setReplacementPassword] = useState('');
 
   const addToast = (text: string, type: 'success' | 'error' | 'info' = 'success') => {
     const id = Date.now().toString() + Math.random().toString().slice(2, 6);
@@ -210,10 +229,10 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
     setLoading(true);
     try {
       const [shots, company] = await Promise.all([
-        axios.get(`${API_URL}/screenshots/company`, auth(token)),
+        fetchAllCompanyScreenshots(token),
         axios.get(`${API_URL}/company-admin/overview`, auth(token)),
       ]);
-      setScreenshots(shots.data);
+      setScreenshots(shots);
       setOverview(company.data);
       if (isManual) addToast('Workspace data refreshed.', 'info');
     } catch (error: any) {
@@ -229,19 +248,63 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
     if (employee.fullName.trim().length < 2) { show('Full name must be at least 2 characters.', true); return; }
     if (employee.username.trim().length < 3) { show('Username must be at least 3 characters.', true); return; }
     if (!/^\S+@\S+\.\S+$/.test(employee.email.trim())) { show('Enter a valid employee email address.', true); return; }
-    if (employee.password.length < 10) { show('Temporary password must be at least 10 characters.', true); return; }
+    if (!isStrongPassword(employee.password)) {
+      show('Temporary password must be at least 12 characters and include upper/lowercase, a number, and a symbol.', true);
+      return;
+    }
     try {
-      await axios.post(`${API_URL}/company-admin/employees`, {
+      const response = await axios.post(`${API_URL}/company-admin/employees`, {
         ...employee,
         fullName: employee.fullName.trim(),
         username: employee.username.trim(),
         email: employee.email.trim().toLowerCase(),
       }, auth(token));
-      show(`Employee ${employee.username} created. You can now generate their key.`);
+      const licenseKey = response.data?.licenseKey;
+      if (licenseKey) {
+        await navigator.clipboard?.writeText(licenseKey).catch(() => undefined);
+        show(`Employee ${employee.username} created. Their activation key was copied: ${licenseKey}`);
+      } else {
+        show(`Employee ${employee.username} created.`);
+      }
       setEmployee({ fullName: '', username: '', email: '', password: '' });
       await fetchCustomerData();
     } catch (error: any) {
       show(apiErrorMessage(error, 'Could not create employee'), true);
+    }
+  };
+
+  const setEmployeeStatus = async (item: any, isActive: boolean) => {
+    try {
+      await axios.post(
+        `${API_URL}/company-admin/employees/${item.id}/status`,
+        { isActive },
+        auth(token),
+      );
+      show(`${item.username} ${isActive ? 'enabled' : 'disabled'}.`);
+      await fetchCustomerData();
+    } catch (error: any) {
+      show(apiErrorMessage(error, 'Could not update employee status'), true);
+    }
+  };
+
+  const resetEmployeePassword = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!passwordResetTarget) return;
+    if (!isStrongPassword(replacementPassword)) {
+      show('The replacement password must be at least 12 characters and include upper/lowercase, a number, and a symbol.', true);
+      return;
+    }
+    try {
+      await axios.post(
+        `${API_URL}/company-admin/employees/${passwordResetTarget.id}/reset-password`,
+        { newPassword: replacementPassword },
+        auth(token),
+      );
+      show(`Password reset for ${passwordResetTarget.username}. Existing sessions were signed out.`);
+      setPasswordResetTarget(null);
+      setReplacementPassword('');
+    } catch (error: any) {
+      show(apiErrorMessage(error, 'Could not reset employee password'), true);
     }
   };
 
@@ -292,10 +355,6 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
   const isActive =
     subscription?.status === 'ACTIVE' &&
     new Date(subscription.endDate).getTime() > Date.now();
-  const storageBytes = screenshots.reduce(
-    (total, item) => total + Number(item.fileSize || 0),
-    0,
-  );
   const buildGroupedDays = (itemsList: any[]) => {
     return Object.values(
       itemsList.reduce(
@@ -350,7 +409,7 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
     { label: 'Subscription', value: subscription?.status || 'NOT CONFIGURED', icon: <KpiIconStatus />, accent: '#dcfce7', border: '#bbf7d0' },
     { label: 'Expires', value: subscription?.endDate ? new Date(subscription.endDate).toLocaleDateString() : '—', icon: <KpiIconExpiry />, accent: '#ede9fe', border: '#ddd6fe' },
     { label: 'Employees', value: `${overview?.usage?.employees || 0} / ${subscription?.maxEmployees || 0}`, icon: <KpiIconEmployees />, accent: '#dbeafe', border: '#bfdbfe' },
-    { label: 'Storage', value: `${(storageBytes / 1024 / 1024).toFixed(1)} MB / ${subscription ? (subscription.maxStorageMb / 1024).toFixed(1) : 0} GB`, icon: <KpiIconStorage />, accent: '#ffedd5', border: '#fed7aa' },
+    { label: 'Screenshots', value: screenshots.length, icon: <Image className="h-[22px] w-[22px] text-orange-600" />, accent: '#ffedd5', border: '#fed7aa' },
   ];
 
   return (
@@ -1029,6 +1088,9 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
                                             {license.status}
                                           </span>
                                           <div className="text-gray-400 text-[11px] mt-0.5">{new Date(license.expiryDate).toLocaleDateString()}</div>
+                                          <div className={`mt-1 text-[10px] font-semibold ${item.isActive ? 'text-green-700' : 'text-red-600'}`}>
+                                            Employee {item.isActive ? 'enabled' : 'disabled'}
+                                          </div>
                                         </>
                                       ) : '—'}
                                     </td>
@@ -1053,7 +1115,7 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
                                           Reset
                                         </button>
                                       )}
-                                      {license && license.status === 'REVOKED' && (
+                                      {license && license.status !== 'ACTIVE' && (
                                         <button
                                           onClick={() => licenseAction(license.id, 'reactivate')}
                                           className="rounded-md bg-green-700 hover:bg-green-800 text-white px-2.5 py-1.5 text-xs font-semibold shadow-sm transition-all"
@@ -1071,6 +1133,28 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
                                           Revoke
                                         </button>
                                       )}
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setPasswordResetTarget(item);
+                                          setReplacementPassword('');
+                                        }}
+                                        className="rounded-md border border-gray-200 px-2.5 py-1.5 text-xs text-gray-600 hover:bg-gray-100 transition-colors"
+                                      >
+                                        <KeyRound className="mr-1 inline h-3 w-3" />
+                                        Password
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => void setEmployeeStatus(item, !item.isActive)}
+                                        className={`rounded-md border px-2.5 py-1.5 text-xs transition-colors ${
+                                          item.isActive
+                                            ? 'border-amber-200 text-amber-700 hover:bg-amber-50'
+                                            : 'border-green-200 text-green-700 hover:bg-green-50'
+                                        }`}
+                                      >
+                                        {item.isActive ? 'Disable' : 'Enable'}
+                                      </button>
                                     </td>
                                   </tr>
                                 );
@@ -1123,6 +1207,57 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
         onCancel={() => setLogoutConfirmationOpen(false)}
         onConfirm={performLogout}
       />
+      {passwordResetTarget && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/55 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="reset-password-title"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setPasswordResetTarget(null);
+          }}
+        >
+          <form
+            onSubmit={resetEmployeePassword}
+            className="w-full max-w-md rounded-lg border border-gray-200 bg-white p-5 shadow-2xl"
+          >
+            <h2 id="reset-password-title" className="text-base font-bold text-gray-900">
+              Reset employee password
+            </h2>
+            <p className="mt-1 text-xs text-gray-500">
+              Set a temporary password for {passwordResetTarget.username}. Their existing sessions will be signed out.
+            </p>
+            <label className="mt-4 block text-xs font-semibold text-gray-700">
+              New temporary password
+              <input
+                autoFocus
+                type="password"
+                minLength={12}
+                required
+                autoComplete="new-password"
+                value={replacementPassword}
+                onChange={(event) => setReplacementPassword(event.target.value)}
+                className="mt-1.5 w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-green-600 focus:ring-2 focus:ring-green-100"
+              />
+            </label>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setPasswordResetTarget(null)}
+                className="rounded-md border border-gray-200 px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="rounded-md bg-green-700 px-4 py-2 text-xs font-semibold text-white hover:bg-green-800"
+              >
+                Reset password
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
       <ToastContainer toasts={toasts} onDismiss={removeToast} />
     </div>
   );
@@ -1144,7 +1279,7 @@ function Field({
       {label}
       <input
         required
-        minLength={type === 'password' ? 10 : undefined}
+        minLength={type === 'password' ? 12 : undefined}
         type={type}
         autoComplete={type === 'password' ? 'new-password' : 'off'}
         value={value}

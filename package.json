@@ -1,12 +1,13 @@
 {
   "name": "screen-advait-monorepo",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
+  "packageManager": "pnpm@11.9.0",
   "description": "Enterprise Desktop Screenshot Management & License Management Platform",
   "scripts": {
     "build": "pnpm --recursive run build",
     "dev": "pnpm --recursive --parallel run dev",
-    "lint": "pnpm --recursive run lint",
+    "lint": "pnpm --recursive --if-present run lint",
     "test": "pnpm build && pnpm --recursive run test:unit",
     "typecheck": "pnpm --recursive run typecheck"
   },
@@ -14,7 +15,7 @@
     "typescript": "^5.7.0"
   },
   "engines": {
-    "node": ">=20.0.0",
-    "pnpm": ">=9.0.0"
+    "node": ">=22.0.0 <25",
+    "pnpm": "11.9.0"
   }
 }

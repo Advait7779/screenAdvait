@@ -1,9 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, Check, CheckCircle2, ChevronDown, Save, Trash2, Zap } from 'lucide-react';
+import { AlertCircle, Check, CheckCircle2, ChevronDown, Save, Trash2 } from 'lucide-react';
 
 const intervalOptions = [
-  { value: '10', label: 'Every 10 Seconds', detail: 'Fastest testing mode', fast: true },
-  { value: '30', label: 'Every 30 Seconds', detail: 'Fast testing mode', fast: true },
   { value: '60', label: 'Every 1 Minute' },
   { value: '300', label: 'Every 5 Minutes', detail: 'Standard default' },
   { value: '600', label: 'Every 10 Minutes' },
@@ -30,7 +28,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ addToast }) => {
   const isSuspended = Boolean(entitlementError);
 
   const selectedInterval = useMemo(
-    () => intervalOptions.find((option) => option.value === interval) || intervalOptions[3],
+    () =>
+      intervalOptions.find((option) => option.value === interval) ||
+      intervalOptions.find((option) => option.value === '300')!,
     [interval],
   );
 
@@ -150,10 +150,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ addToast }) => {
         <div>
           <label className="text-xs font-semibold text-gray-700 mb-1.5 flex items-center justify-between">
             <span>Screenshot Capture Interval</span>
-            <span className="text-green-800 font-bold flex items-center space-x-1">
-              <Zap className="w-3 h-3 text-amber-500" />
-              <span>Fast Testing Mode Supported</span>
-            </span>
+            <span className="text-green-800 font-bold">Applied after saving</span>
           </label>
 
           <div ref={intervalMenuRef} className="relative">
@@ -170,9 +167,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ addToast }) => {
               aria-expanded={intervalMenuOpen}
             >
               <span className="flex items-center gap-2 min-w-0">
-                {selectedInterval.fast && (
-                  <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-100 shrink-0" />
-                )}
                 <span className="truncate">{selectedInterval.label}</span>
                 {selectedInterval.detail && (
                   <span className="text-gray-400 font-normal hidden sm:inline">
@@ -213,17 +207,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ addToast }) => {
                       aria-selected={isSelected}
                     >
                       <span className="flex items-center gap-2 min-w-0">
-                        {option.fast ? (
-                          <Zap
-                            className={`w-3.5 h-3.5 shrink-0 ${
-                              isSelected
-                                ? 'text-amber-300 fill-amber-300/20'
-                                : 'text-amber-500 fill-amber-100'
-                            }`}
-                          />
-                        ) : (
-                          <span className="w-3.5 shrink-0" />
-                        )}
                         <span>
                           <span className="block text-xs font-semibold">{option.label}</span>
                           {option.detail && (

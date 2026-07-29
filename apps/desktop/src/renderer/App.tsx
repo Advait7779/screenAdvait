@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { HashRouter, Routes, Route, NavLink, Navigate } from 'react-router-dom';
 import { LogOut, ShieldCheck, ChevronRight } from 'lucide-react';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
@@ -8,6 +7,28 @@ import { QueuePage } from './pages/QueuePage';
 import { SettingsPage } from './pages/SettingsPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { ToastContainer, ToastMessage } from './ToastContainer';
+
+function maskedLicenseKey(value?: string) {
+  if (!value) return 'Protected';
+  const parts = value.split('-');
+  return parts.length >= 2
+    ? `${parts[0]}-****-****-****-${parts.at(-1)?.slice(-4) || '****'}`
+    : `****${value.slice(-4)}`;
+}
+
+type PagePath = '/' | '/gallery' | '/queue' | '/settings' | '/profile';
+const VALID_PAGE_PATHS = new Set<PagePath>([
+  '/',
+  '/gallery',
+  '/queue',
+  '/settings',
+  '/profile',
+]);
+
+function currentPagePath(): PagePath {
+  const value = window.location.hash.replace(/^#/, '') || '/';
+  return VALID_PAGE_PATHS.has(value as PagePath) ? (value as PagePath) : '/';
+}
 
 // ── Colorful SVG nav icons ────────────────────────────────────────────────────
 function IconDashboard({ active }: { active: boolean }) {
@@ -60,6 +81,7 @@ export function App() {
   const [loading, setLoading] = useState(true);
   const [logoutConfirmationOpen, setLogoutConfirmationOpen] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [page, setPage] = useState<PagePath>(currentPagePath);
 
   const addToast = (text: string, type: 'success' | 'error' | 'info' = 'success') => {
     const id = Date.now().toString() + Math.random().toString().slice(2, 6);
@@ -107,6 +129,21 @@ export function App() {
     return () => window.removeEventListener('keydown', closeOnEscape);
   }, [logoutConfirmationOpen]);
 
+  useEffect(() => {
+    const handleHashChange = () => setPage(currentPagePath());
+    window.addEventListener('hashchange', handleHashChange);
+    if (!VALID_PAGE_PATHS.has(window.location.hash.replace(/^#/, '') as PagePath)) {
+      window.location.hash = '/';
+    }
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
+  const navigate = (destination: PagePath) => {
+    if (page === destination) return;
+    window.location.hash = destination;
+    setPage(destination);
+  };
+
   const requestLogout = () => setLogoutConfirmationOpen(true);
 
   const performLogout = async () => {
@@ -143,7 +180,7 @@ export function App() {
   }
 
   const navLinks = [
-    { to: '/', label: 'Dashboard', Icon: IconDashboard, end: true },
+    { to: '/', label: 'Dashboard', Icon: IconDashboard },
     { to: '/gallery', label: 'Gallery', Icon: IconGallery },
     { to: '/queue', label: 'Upload Queue', Icon: IconUpload },
     { to: '/settings', label: 'Settings', Icon: IconSettings },
@@ -151,7 +188,7 @@ export function App() {
   ];
 
   return (
-    <HashRouter>
+    <>
       <div className="flex h-screen overflow-hidden font-sans" style={{ background: '#f0f2f5' }}>
 
         {/* ── Dark sidebar ──────────────────────────────────────────── */}
@@ -175,14 +212,15 @@ export function App() {
           {/* Nav */}
           <nav className="flex-1 px-2.5 py-4 space-y-0.5">
             <div className="text-[9px] uppercase font-bold text-gray-500 px-3 mb-2.5 tracking-widest">Navigation</div>
-            {navLinks.map(({ to, label, Icon, end }) => (
-              <NavLink
+            {navLinks.map(({ to, label, Icon }) => {
+              const isActive = page === to;
+              return (
+              <button
                 key={to}
-                to={to}
-                end={end}
-                className={({ isActive }) => 'block'}
+                type="button"
+                onClick={() => navigate(to as PagePath)}
+                className="block w-full text-left"
               >
-                {({ isActive }) => (
                   <span
                     className="flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-all"
                     style={{
@@ -196,9 +234,8 @@ export function App() {
                     <span className="flex-1">{label}</span>
                     {isActive && <ChevronRight className="w-3 h-3 opacity-60" />}
                   </span>
-                )}
-              </NavLink>
-            ))}
+              </button>
+            )})}
           </nav>
 
           {/* User card */}
@@ -228,7 +265,9 @@ export function App() {
               <ShieldCheck className="w-3.5 h-3.5 text-green-700" />
               <span>Hardware GUID Lock Verified</span>
               <span className="text-gray-300">•</span>
-              <span className="text-green-700 font-mono">License: {session?.licenseStatus?.key}</span>
+              <span className="text-green-700 font-mono">
+                License: {maskedLicenseKey(session?.licenseStatus?.key)}
+              </span>
             </div>
             <div className="flex items-center gap-1.5 text-[11px] font-semibold text-green-700">
               <span className="w-1.5 h-1.5 rounded-full bg-green-600"></span>
@@ -238,14 +277,11 @@ export function App() {
 
           {/* Content */}
           <main className="flex-1 overflow-y-auto p-5" style={{ background: '#f0f2f5' }}>
-            <Routes>
-              <Route path="/" element={<DashboardPage session={session} addToast={addToast} />} />
-              <Route path="/gallery" element={<GalleryPage addToast={addToast} />} />
-              <Route path="/queue" element={<QueuePage addToast={addToast} />} />
-              <Route path="/settings" element={<SettingsPage addToast={addToast} />} />
-              <Route path="/profile" element={<ProfilePage session={session} onLogout={requestLogout} addToast={addToast} />} />
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
+            {page === '/' && <DashboardPage session={session} addToast={addToast} onNavigate={navigate} />}
+            {page === '/gallery' && <GalleryPage />}
+            {page === '/queue' && <QueuePage addToast={addToast} />}
+            {page === '/settings' && <SettingsPage addToast={addToast} />}
+            {page === '/profile' && <ProfilePage session={session} onLogout={requestLogout} />}
           </main>
         </div>
       </div>
@@ -297,6 +333,6 @@ export function App() {
       )}
 
       <ToastContainer toasts={toasts} onDismiss={removeToast} />
-    </HashRouter>
+    </>
   );
 }

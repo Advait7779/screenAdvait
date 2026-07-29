@@ -135,6 +135,12 @@ if (!gotTheLock) {
 
   app.whenReady().then(() => {
     const db = initSqliteDb();
+    const autoStart = db.prepare('SELECT value FROM local_settings WHERE key = ?').get('autoStart') as
+      | { value: string }
+      | undefined;
+    if (app.isPackaged) {
+      app.setLoginItemSettings({ openAtLogin: autoStart?.value !== 'false' });
+    }
     startRetentionCleanupWorker();
     registerIpcHandlers();
 

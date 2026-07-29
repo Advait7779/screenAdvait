@@ -110,6 +110,12 @@ class JsonFallbackStore implements IDbStore {
           return Object.entries(this.data.local_settings).map(([key, value]) => ({ key, value }));
         }
         if (s.includes('from upload_queue')) {
+          if (s.includes('captured_at >= ?')) {
+            const cutoff = String(args[0]);
+            return this.data.upload_queue
+              .filter((item) => String(item.captured_at) >= cutoff)
+              .sort((a, b) => String(b.captured_at).localeCompare(String(a.captured_at)));
+          }
           if (s.includes('captured_at < ?')) {
             const cutoff = String(args[0]);
             return this.data.upload_queue

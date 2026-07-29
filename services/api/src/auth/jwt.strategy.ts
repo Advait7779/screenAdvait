@@ -22,13 +22,14 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     role: string;
     companyId: string;
     licenseId?: string;
+    tokenVersion: number;
   }) {
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
       include: { company: true },
     });
 
-    if (!user || !user.isActive) {
+    if (!user || !user.isActive || payload.tokenVersion !== user.tokenVersion) {
       throw new UnauthorizedException('User account disabled or not found');
     }
 

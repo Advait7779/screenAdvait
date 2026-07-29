@@ -9,7 +9,7 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { LicenseStatus, Prisma, Role } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
-import { LoginInput, PortalLoginInput } from '@screenadvait/shared-utils';
+import { ChangePasswordInput, LoginInput, PortalLoginInput } from '@screenadvait/shared-utils';
 import { EntitlementService } from '../entitlements/entitlement.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 
@@ -20,6 +20,7 @@ interface TokenPayload {
   role: string;
   companyId: string;
   licenseId?: string;
+  tokenVersion: number;
   tokenType: 'access' | 'refresh';
 }
 
@@ -122,6 +123,7 @@ export class AuthService {
       role: user.role,
       companyId: user.companyId,
       licenseId: license.id,
+      tokenVersion: user.tokenVersion,
       tokenType: 'access',
     });
 
@@ -189,6 +191,7 @@ export class AuthService {
     if (
       !user?.isActive ||
       !license ||
+      payload.tokenVersion !== user.tokenVersion ||
       license.companyId !== user.companyId ||
       (license.userId && license.userId !== user.id)
     ) {
@@ -203,6 +206,7 @@ export class AuthService {
       role: user.role,
       companyId: user.companyId,
       licenseId: license.id,
+      tokenVersion: user.tokenVersion,
       tokenType: 'access',
     });
   }
@@ -245,6 +249,7 @@ export class AuthService {
         username: user.username,
         role: user.role,
         companyId: user.companyId,
+        tokenVersion: user.tokenVersion,
         tokenType: 'access',
       },
       { expiresIn: '8h' },
@@ -277,6 +282,39 @@ export class AuthService {
           }
         : null,
     };
+  }
+
+  async changePassword(userId: string, input: ChangePasswordInput) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || !(await bcrypt.compare(input.currentPassword, user.passwordHash))) {
+      throw new UnauthorizedException('Current password is incorrect');
+    }
+    if (await bcrypt.compare(input.newPassword, user.passwordHash)) {
+      throw new ForbiddenException('New password must be different from the current password');
+    }
+    const passwordHash = await bcrypt.hash(input.newPassword, 12);
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: userId },
+        data: { passwordHash, tokenVersion: { increment: 1 } },
+      }),
+      this.prisma.auditLog.create({
+        data: {
+          companyId: user.companyId,
+          userId,
+          action: 'PASSWORD_CHANGED',
+          entity: 'User',
+          entityId: userId,
+        },
+      }),
+    ]);
+  }
+
+  async logout(userId: string) {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { tokenVersion: { increment: 1 } },
+    });
   }
 
   private async issueTokens(base: TokenPayload) {
@@ -322,22 +360,27 @@ export class AuthService {
       async (tx) => {
         const existing = await tx.device.findUnique({ where: { deviceId } });
         if (existing) {
+          if (
+            existing.licenseId !== licenseId ||
+            existing.userId !== userId ||
+            existing.machineGuid !== machineGuid
+          ) {
+            throw new ForbiddenException(
+              'This device is already activated for another employee or its hardware identity changed',
+            );
+          }
           await tx.device.update({
             where: { id: existing.id },
-            data: { licenseId, userId, machineGuid, lastSeenAt: new Date(), ipAddress, os, computerName },
+            data: { lastSeenAt: new Date(), ipAddress, os, computerName },
           });
           return;
         }
 
         const count = await tx.device.count({ where: { licenseId } });
         if (count >= maxDevices) {
-          const oldestDevice = await tx.device.findFirst({
-            where: { licenseId },
-            orderBy: { lastSeenAt: 'asc' },
-          });
-          if (oldestDevice) {
-            await tx.device.delete({ where: { id: oldestDevice.id } });
-          }
+          throw new ForbiddenException(
+            `Device limit reached (${maxDevices}). Ask your administrator to reset an old device.`,
+          );
         }
 
         await tx.device.create({

@@ -7,10 +7,9 @@ cd /d "%PROJECT_ROOT%"
 echo Closing previously launched ScreenAdvait windows...
 taskkill /FI "WINDOWTITLE eq ScreenAdvait API*" /T /F >nul 2>nul
 taskkill /FI "WINDOWTITLE eq ScreenAdvait Admin Web*" /T /F >nul 2>nul
-taskkill /FI "WINDOWTITLE eq ScreenAdvait Customer Web*" /T /F >nul 2>nul
 taskkill /FI "WINDOWTITLE eq ScreenAdvait Desktop Renderer*" /T /F >nul 2>nul
 taskkill /FI "WINDOWTITLE eq ScreenAdvait Desktop*" /T /F >nul 2>nul
-for %%Q in (3000 3001 3002 5000) do (
+for %%Q in (3000 3001 5000) do (
   for /f "tokens=5" %%P in ('netstat -ano ^| findstr /R /C:":%%Q .*LISTENING"') do (
     taskkill /PID %%P /T /F >nul 2>nul
   )

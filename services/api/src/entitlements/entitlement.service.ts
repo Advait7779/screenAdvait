@@ -10,29 +10,11 @@ export class EntitlementService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getCurrentSubscription(companyId: string) {
-    let subscription = await this.prisma.subscription.findFirst({
+    const subscription = await this.prisma.subscription.findFirst({
       where: { companyId },
       orderBy: [{ createdAt: 'desc' }, { startDate: 'desc' }],
     });
-    if (!subscription) {
-      const company = await this.prisma.company.findUnique({ where: { id: companyId } });
-      if (!company) return null;
-      const startDate = new Date();
-      const endDate = new Date();
-      endDate.setDate(startDate.getDate() + 365);
-      subscription = await this.prisma.subscription.create({
-        data: {
-          companyId,
-          plan: 'ONE_YEAR',
-          status: SubscriptionStatus.ACTIVE,
-          startDate,
-          endDate,
-          maxEmployees: company.maxUsers || 10,
-          maxDevices: company.maxUsers || 10,
-          maxStorageMb: company.maxStorageMb || BigInt(10240),
-        },
-      });
-    }
+    if (!subscription) return null;
 
     if (
       subscription.status === SubscriptionStatus.ACTIVE &&

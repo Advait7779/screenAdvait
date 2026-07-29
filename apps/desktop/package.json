@@ -1,6 +1,6 @@
 {
   "name": "@screenadvait/desktop",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "ScreenAdvait enterprise desktop capture client",
   "author": "ScreenAdvait",
   "private": true,
@@ -22,8 +22,6 @@
     "lucide-react": "^0.439.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "react-router-dom": "^6.26.1",
-    "screenshot-desktop": "^1.15.0",
     "tailwind-merge": "^2.5.2"
   },
   "devDependencies": {
@@ -46,8 +44,7 @@
     "files": ["dist/**/*", "public/**/*", "package.json"],
     "asar": { "smartUnpack": false },
     "asarUnpack": [
-      "node_modules/better-sqlite3/build/Release/better_sqlite3.node",
-      "node_modules/screenshot-desktop/lib/win32/**/*"
+      "node_modules/better-sqlite3/build/Release/better_sqlite3.node"
     ],
     "win": {
       "target": "nsis",

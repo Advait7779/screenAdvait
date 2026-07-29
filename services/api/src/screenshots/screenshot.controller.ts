@@ -5,6 +5,7 @@ import {
   Get,
   Param,
   Post,
+  Query,
   Req,
   Res,
   UploadedFile,
@@ -42,7 +43,12 @@ export class ScreenshotController {
   async uploadScreenshot(
     @UploadedFile() file: Express.Multer.File,
     @Body(new ZodValidationPipe(ScreenshotUploadMetadataSchema))
-    body: { deviceId: string; capturedAt: string },
+    body: {
+      deviceId: string;
+      capturedAt: string;
+      idempotencyKey: string;
+      timezoneOffsetMinutes: number;
+    },
     @Req() req: any,
   ) {
     if (!file) throw new BadRequestException('Screenshot file is required');
@@ -51,18 +57,36 @@ export class ScreenshotController {
       companyId: req.user.companyId,
       deviceId: body.deviceId,
       capturedAt: body.capturedAt,
+      idempotencyKey: body.idempotencyKey,
+      timezoneOffsetMinutes: body.timezoneOffsetMinutes,
     });
   }
 
   @Get('mine')
-  getMyScreenshots(@Req() req: any) {
-    return this.screenshotService.getMyScreenshots(req.user.id);
+  getMyScreenshots(
+    @Req() req: any,
+    @Query('cursor') cursor?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.screenshotService.getMyScreenshots(
+      req.user.id,
+      cursor,
+      this.parseLimit(limit),
+    );
   }
 
   @Get('company')
   @Roles(Role.COMPANY_ADMIN, Role.SUPER_ADMIN)
-  getCompanyScreenshots(@Req() req: any) {
-    return this.screenshotService.getCompanyScreenshots(req.user.companyId);
+  getCompanyScreenshots(
+    @Req() req: any,
+    @Query('cursor') cursor?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.screenshotService.getCompanyScreenshots(
+      req.user.companyId,
+      cursor,
+      this.parseLimit(limit),
+    );
   }
 
   @Get(':id/file')
@@ -76,5 +100,14 @@ export class ScreenshotController {
     res.setHeader('Content-Disposition', `inline; filename="${file.fileName.replace(/[\r\n"\\]/g, '_')}"`);
     res.setHeader('Cache-Control', 'private, max-age=300');
     res.send(file.buffer);
+  }
+
+  private parseLimit(value?: string) {
+    if (!value) return 500;
+    const parsed = Number(value);
+    if (!Number.isInteger(parsed) || parsed < 1 || parsed > 1000) {
+      throw new BadRequestException('limit must be an integer between 1 and 1000');
+    }
+    return parsed;
   }
 }

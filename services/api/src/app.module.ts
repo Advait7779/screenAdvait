@@ -9,10 +9,11 @@ import { HealthController } from './health.controller.js';
 import { EntitlementModule } from './entitlements/entitlement.module.js';
 import { SubscriptionModule } from './subscriptions/subscription.module.js';
 import { CompanyAdminModule } from './company-admin/company-admin.module.js';
+import { validateEnvironment } from './config/validate-env.js';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({ isGlobal: true, validate: validateEnvironment }),
     PrismaModule,
     EntitlementModule,
     AuthModule,

@@ -18,11 +18,19 @@ export class LicenseController {
   constructor(private licenseService: LicenseService) {}
 
   @Post('verify')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(Role.EMPLOYEE)
   async verifyLicense(
     @Body(new ZodValidationPipe(VerifyLicenseSchema))
     body: { licenseKey: string; deviceId: string; machineGuid: string },
+    @Req() req: any,
   ) {
-    return this.licenseService.verifyLicense(body.licenseKey, body.deviceId, body.machineGuid);
+    return this.licenseService.verifyLicense(
+      body.licenseKey,
+      body.deviceId,
+      body.machineGuid,
+      req.user.tokenLicenseId,
+    );
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)

@@ -6,6 +6,7 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { Role, UploadStatus } from '@prisma/client';
+import * as crypto from 'crypto';
 import { EntitlementService } from '../entitlements/entitlement.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { GoogleDriveService } from './google-drive.service.js';
@@ -19,13 +20,21 @@ export class ScreenshotService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    void this.storage.migrateLegacyStorage(this.prisma);
+    await this.storage.migrateLegacyStorage(this.prisma);
   }
 
   async processUpload(
     file: Express.Multer.File,
-    meta: { userId: string; companyId: string; deviceId: string; capturedAt: string },
+    meta: {
+      userId: string;
+      companyId: string;
+      deviceId: string;
+      capturedAt: string;
+      idempotencyKey: string;
+      timezoneOffsetMinutes: number;
+    },
   ) {
+    this.assertImageSignature(file.buffer, file.mimetype);
     const capturedDate = new Date(meta.capturedAt);
     if (Number.isNaN(capturedDate.getTime()) || capturedDate.getTime() > Date.now() + 15 * 60_000) {
       throw new BadRequestException('Invalid capture timestamp');
@@ -37,32 +46,19 @@ export class ScreenshotService implements OnModuleInit {
     });
     if (!user) throw new NotFoundException('Active user not found');
 
-    let device = await this.prisma.device.findFirst({
+    const normalizedIdempotencyKey = crypto
+      .createHash('sha256')
+      .update(`${meta.userId}:${meta.idempotencyKey}`)
+      .digest('hex');
+    const existingUpload = await this.prisma.screenshot.findUnique({
+      where: { idempotencyKey: normalizedIdempotencyKey },
+    });
+    if (existingUpload) return this.toUploadResponse(existingUpload);
+
+    const device = await this.prisma.device.findFirst({
       where: { deviceId: meta.deviceId, userId: user.id },
       include: { license: true },
     });
-
-    if (!device) {
-      const userLicense = await this.prisma.license.findFirst({
-        where: { userId: user.id, companyId: user.companyId, status: 'ACTIVE' },
-      });
-      if (userLicense) {
-        const count = await this.prisma.device.count({ where: { licenseId: userLicense.id } });
-        if (count < userLicense.maxDevices) {
-          const created = await this.prisma.device.create({
-            data: {
-              userId: user.id,
-              licenseId: userLicense.id,
-              deviceId: meta.deviceId,
-              machineGuid: meta.deviceId.replace('dev_', ''),
-              os: 'Windows',
-              computerName: 'WORKSTATION',
-            },
-          });
-          device = { ...created, license: userLicense };
-        }
-      }
-    }
 
     if (
       !device ||
@@ -71,76 +67,95 @@ export class ScreenshotService implements OnModuleInit {
       throw new ForbiddenException('Device is not activated under a valid license');
     }
     const entitlement = await this.entitlements.assertLicenseActive(device.license.id);
-
-    const usage = await this.prisma.screenshot.aggregate({
-      where: { companyId: user.companyId },
-      _sum: { fileSize: true },
+    await this.prisma.device.update({
+      where: { id: device.id },
+      data: { lastSeenAt: new Date() },
     });
-    const quotaBytes = entitlement.subscription.maxStorageMb * BigInt(1024 * 1024);
-    if ((usage._sum.fileSize || BigInt(0)) + BigInt(file.size) > quotaBytes) {
-      throw new ForbiddenException('Company screenshot storage quota exceeded');
-    }
 
-    const year = capturedDate.getFullYear();
-    const month = capturedDate.getMonth() + 1;
-    const day = capturedDate.getDate();
-    const stored = await this.storage.uploadScreenshot(
-      file.buffer,
-      file.originalname,
-      file.mimetype,
-      user.company.name,
-      user.username,
-      year,
-      month,
-      day,
+    const quotaBytes = entitlement.subscription.maxStorageMb * BigInt(1024 * 1024);
+    const localCaptureDate = new Date(
+      capturedDate.getTime() + meta.timezoneOffsetMinutes * 60_000,
     );
+    const year = localCaptureDate.getUTCFullYear();
+    const month = localCaptureDate.getUTCMonth() + 1;
+    const day = localCaptureDate.getUTCDate();
+    let storedFileId: string | null = null;
 
     try {
-      const screenshot = await this.prisma.screenshot.create({
-        data: {
-          companyId: user.companyId,
-          userId: user.id,
-          deviceId: device.id,
-          fileKey: stored.fileId,
-          fileName: file.originalname,
-          fileSize: BigInt(file.size),
-          mimeType: file.mimetype,
-          uploadStatus: UploadStatus.COMPLETED,
-          driveFileId: stored.fileId,
-          driveViewUrl: stored.viewUrl,
-          capturedAt: capturedDate,
-          year,
-          month,
-          day,
-        },
-      });
+      return await this.prisma.$transaction(
+        async (tx) => {
+          await tx.$queryRaw`
+            SELECT pg_advisory_xact_lock(hashtextextended(${user.companyId}, 0))
+          `;
 
-      return {
-        id: screenshot.id,
-        fileName: screenshot.fileName,
-        fileSize: Number(screenshot.fileSize),
-        uploadStatus: screenshot.uploadStatus,
-        driveFileId: screenshot.driveFileId,
-        driveViewUrl: screenshot.driveViewUrl,
-        fileUrl: `/api/v1/screenshots/${screenshot.id}/file`,
-        capturedAt: screenshot.capturedAt,
-      };
+          const duplicate = await tx.screenshot.findUnique({
+            where: { idempotencyKey: normalizedIdempotencyKey },
+          });
+          if (duplicate) return this.toUploadResponse(duplicate);
+
+          const usage = await tx.screenshot.aggregate({
+            where: { companyId: user.companyId },
+            _sum: { fileSize: true },
+          });
+          if ((usage._sum.fileSize || BigInt(0)) + BigInt(file.size) > quotaBytes) {
+            throw new ForbiddenException('Company screenshot storage quota exceeded');
+          }
+
+          const stored = await this.storage.uploadScreenshot(
+            file.buffer,
+            file.originalname,
+            file.mimetype,
+            `${user.company.code}-${user.company.id.slice(0, 8)}`,
+            user.username,
+            year,
+            month,
+            day,
+          );
+          storedFileId = stored.fileId;
+
+          const screenshot = await tx.screenshot.create({
+            data: {
+              companyId: user.companyId,
+              userId: user.id,
+              deviceId: device.id,
+              fileKey: stored.fileId,
+              fileName: file.originalname,
+              fileSize: BigInt(file.size),
+              mimeType: file.mimetype,
+              uploadStatus: UploadStatus.COMPLETED,
+              driveFileId: stored.fileId,
+              driveViewUrl: stored.viewUrl,
+              idempotencyKey: normalizedIdempotencyKey,
+              capturedAt: capturedDate,
+              timezoneOffsetMinutes: meta.timezoneOffsetMinutes,
+              year,
+              month,
+              day,
+            },
+          });
+          return this.toUploadResponse(screenshot);
+        },
+        { maxWait: 10_000, timeout: 45_000 },
+      );
     } catch (error) {
-      await this.storage.deleteFile(stored.fileId).catch(() => undefined);
+      if (storedFileId) {
+        await this.storage.deleteFile(storedFileId).catch(() => undefined);
+      }
       throw error;
     }
   }
 
-  async getMyScreenshots(userId: string) {
+  async getMyScreenshots(userId: string, cursor?: string, limit = 500) {
     const screenshots = await this.prisma.screenshot.findMany({
       where: { userId },
-      orderBy: { capturedAt: 'desc' },
-      take: 100,
+      orderBy: [{ capturedAt: 'desc' }, { id: 'desc' }],
+      take: limit + 1,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     });
-    return screenshots.map((s) => this.toResponse(s));
+    return this.toPage(screenshots, limit);
   }
 
-  async getCompanyScreenshots(companyId: string) {
+  async getCompanyScreenshots(companyId: string, cursor?: string, limit = 500) {
     const screenshots = await this.prisma.screenshot.findMany({
       where: { companyId },
       select: {
@@ -163,10 +178,11 @@ export class ScreenshotService implements OnModuleInit {
         user: { select: { id: true, username: true, fullName: true } },
         device: { select: { id: true, deviceId: true, os: true, computerName: true } },
       },
-      orderBy: { capturedAt: 'desc' },
-      take: 200,
+      orderBy: [{ capturedAt: 'desc' }, { id: 'desc' }],
+      take: limit + 1,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     });
-    return screenshots.map((s) => this.toResponse(s));
+    return this.toPage(screenshots, limit);
   }
 
   async getFile(
@@ -197,5 +213,46 @@ export class ScreenshotService implements OnModuleInit {
       fileSize: Number(screenshot.fileSize),
       fileUrl: `/api/v1/screenshots/${screenshot.id}/file`,
     };
+  }
+
+  private toUploadResponse(screenshot: any) {
+    return {
+      id: screenshot.id,
+      fileName: screenshot.fileName,
+      fileSize: Number(screenshot.fileSize),
+      uploadStatus: screenshot.uploadStatus,
+      driveFileId: screenshot.driveFileId,
+      driveViewUrl: screenshot.driveViewUrl,
+      fileUrl: `/api/v1/screenshots/${screenshot.id}/file`,
+      capturedAt: screenshot.capturedAt,
+    };
+  }
+
+  private toPage<T extends { id: string; fileSize: bigint }>(
+    screenshots: T[],
+    limit: number,
+  ) {
+    const hasMore = screenshots.length > limit;
+    const items = hasMore ? screenshots.slice(0, limit) : screenshots;
+    return {
+      items: items.map((item) => this.toResponse(item)),
+      nextCursor: hasMore ? items[items.length - 1]?.id || null : null,
+    };
+  }
+
+  private assertImageSignature(buffer: Buffer, mimeType: string) {
+    const png =
+      buffer.length >= 8 &&
+      buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+    const jpeg = buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
+    const webp =
+      buffer.length >= 12 &&
+      buffer.subarray(0, 4).toString('ascii') === 'RIFF' &&
+      buffer.subarray(8, 12).toString('ascii') === 'WEBP';
+    const valid =
+      (mimeType === 'image/png' && png) ||
+      (mimeType === 'image/jpeg' && jpeg) ||
+      (mimeType === 'image/webp' && webp);
+    if (!valid) throw new BadRequestException('File content does not match the declared image type');
   }
 }

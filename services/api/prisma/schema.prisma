@@ -56,23 +56,23 @@ enum ImageQuality {
 }
 
 model Company {
-  id            String         @id @default(uuid())
-  name          String
-  code          String         @unique
-  contactEmail  String
-  contactPhone  String?
-  maxUsers      Int            @default(10)
-  maxStorageMb  BigInt         @default(10240)
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  id           String   @id @default(uuid())
+  name         String
+  code         String   @unique
+  contactEmail String
+  contactPhone String?
+  maxUsers     Int      @default(10)
+  maxStorageMb BigInt   @default(10240)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  users         User[]
-  licenses      License[]
-  screenshots   Screenshot[]
-  invoices      Invoice[]
-  subscriptions Subscription[]
-  auditLogs     AuditLog[]
-  reports       Report[]
+  users           User[]
+  licenses        License[]
+  screenshots     Screenshot[]
+  invoices        Invoice[]
+  subscriptions   Subscription[]
+  auditLogs       AuditLog[]
+  reports         Report[]
   driveConnection GoogleDriveConnection?
 
   @@map("companies")
@@ -96,56 +96,57 @@ model GoogleDriveConnection {
 }
 
 model User {
-  id           String      @id @default(uuid())
+  id           String   @id @default(uuid())
   companyId    String?
-  company      Company?    @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  email        String      @unique
-  username     String      @unique
+  company      Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  email        String   @unique
+  username     String   @unique
   passwordHash String
   fullName     String
-  role         Role        @default(EMPLOYEE)
-  isActive     Boolean     @default(true)
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  role         Role     @default(EMPLOYEE)
+  isActive     Boolean  @default(true)
+  tokenVersion Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  licenses     License[]
-  devices      Device[]
-  screenshots  Screenshot[]
-  loginLogs    LoginLog[]
-  auditLogs    AuditLog[]
-  settings     Setting?
+  licenses    License[]
+  devices     Device[]
+  screenshots Screenshot[]
+  loginLogs   LoginLog[]
+  auditLogs   AuditLog[]
+  settings    Setting?
 
-  @@map("users")
   @@index([companyId, role])
+  @@map("users")
 }
 
 model License {
-  id               String          @id @default(uuid())
-  key              String          @unique
+  id               String        @id @default(uuid())
+  key              String        @unique
   companyId        String
-  company          Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company          Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
   subscriptionId   String
-  subscription     Subscription    @relation(fields: [subscriptionId], references: [id], onDelete: Restrict)
+  subscription     Subscription  @relation(fields: [subscriptionId], references: [id], onDelete: Restrict)
   userId           String?
-  user             User?           @relation(fields: [userId], references: [id])
-  plan             LicensePlan     @default(MONTHLY)
-  status           LicenseStatus   @default(ACTIVE)
-  maxDevices       Int             @default(1)
-  currentDevices   Int             @default(0)
-  issueDate        DateTime        @default(now())
+  user             User?         @relation(fields: [userId], references: [id])
+  plan             LicensePlan   @default(MONTHLY)
+  status           LicenseStatus @default(ACTIVE)
+  maxDevices       Int           @default(1)
+  currentDevices   Int           @default(0)
+  issueDate        DateTime      @default(now())
   expiryDate       DateTime
   renewalDate      DateTime?
   lastVerification DateTime?
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
 
-  history          LicenseHistory[]
-  devices          Device[]
+  history LicenseHistory[]
+  devices Device[]
 
-  @@map("licenses")
   @@index([companyId, status])
   @@index([subscriptionId, status])
   @@index([userId])
+  @@map("licenses")
 }
 
 model LicenseHistory {
@@ -161,51 +162,53 @@ model LicenseHistory {
 }
 
 model Device {
-  id           String      @id @default(uuid())
+  id           String   @id @default(uuid())
   userId       String
-  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   licenseId    String
-  license      License     @relation(fields: [licenseId], references: [id], onDelete: Cascade)
-  deviceId     String      @unique
+  license      License  @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+  deviceId     String   @unique
   machineGuid  String
   os           String
   computerName String
   ipAddress    String?
-  activatedAt  DateTime    @default(now())
-  lastSeenAt   DateTime    @default(now())
+  activatedAt  DateTime @default(now())
+  lastSeenAt   DateTime @default(now())
 
-  screenshots  Screenshot[]
+  screenshots Screenshot[]
 
-  @@map("devices")
   @@index([licenseId])
   @@index([userId])
+  @@map("devices")
 }
 
 model Screenshot {
-  id           String       @id @default(uuid())
-  companyId    String
-  company      Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  userId       String
-  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  deviceId     String?
-  device       Device?      @relation(fields: [deviceId], references: [id], onDelete: SetNull)
-  fileKey      String
-  fileName     String
-  fileSize     BigInt
-  mimeType     String
-  uploadStatus UploadStatus @default(COMPLETED)
-  driveFileId  String?
-  driveViewUrl String?
-  capturedAt   DateTime
-  year         Int
-  month        Int
-  day          Int
-  createdAt    DateTime     @default(now())
+  id                    String       @id @default(uuid())
+  companyId             String
+  company               Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  userId                String
+  user                  User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceId              String?
+  device                Device?      @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  fileKey               String
+  fileName              String
+  fileSize              BigInt
+  mimeType              String
+  uploadStatus          UploadStatus @default(COMPLETED)
+  driveFileId           String?
+  driveViewUrl          String?
+  idempotencyKey        String?      @unique
+  capturedAt            DateTime
+  timezoneOffsetMinutes Int          @default(0)
+  year                  Int
+  month                 Int
+  day                   Int
+  createdAt             DateTime     @default(now())
 
-  @@map("screenshots")
   @@index([companyId, capturedAt])
   @@index([userId, capturedAt])
   @@index([deviceId])
+  @@map("screenshots")
 }
 
 model Setting {
@@ -232,26 +235,26 @@ model LoginLog {
   status    String
   timestamp DateTime @default(now())
 
-  @@map("login_logs")
   @@index([userId, timestamp])
   @@index([ipAddress, timestamp])
+  @@map("login_logs")
 }
 
 model AuditLog {
-  id         String   @id @default(uuid())
-  companyId  String?
-  company    Company? @relation(fields: [companyId], references: [id])
-  userId     String?
-  user       User?    @relation(fields: [userId], references: [id])
-  action     String
-  entity     String
-  entityId   String?
-  details    Json?
-  timestamp  DateTime @default(now())
+  id        String   @id @default(uuid())
+  companyId String?
+  company   Company? @relation(fields: [companyId], references: [id])
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  action    String
+  entity    String
+  entityId  String?
+  details   Json?
+  timestamp DateTime @default(now())
 
-  @@map("audit_logs")
   @@index([companyId, timestamp])
   @@index([userId, timestamp])
+  @@map("audit_logs")
 }
 
 model Invoice {
@@ -265,7 +268,7 @@ model Invoice {
   dueDate     DateTime
   pdfUrl      String?
 
-  payments    Payment[]
+  payments Payment[]
 
   @@map("invoices")
 }
@@ -298,8 +301,8 @@ model Subscription {
   updatedAt       DateTime           @updatedAt
   licenses        License[]
 
-  @@map("subscriptions")
   @@index([companyId, status])
+  @@map("subscriptions")
 }
 
 model Report {

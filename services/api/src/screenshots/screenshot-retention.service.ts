@@ -7,6 +7,7 @@ import * as path from 'path';
 const DEFAULT_RETENTION_DAYS = 7;
 const CLEANUP_INTERVAL_MS = 60 * 60 * 1000;
 const CLEANUP_BATCH_SIZE = 500;
+const RETENTION_LOCK_ID = BigInt('721420260729');
 
 @Injectable()
 export class ScreenshotRetentionService implements OnModuleInit, OnModuleDestroy {
@@ -118,10 +119,28 @@ export class ScreenshotRetentionService implements OnModuleInit, OnModuleDestroy
   }
 
   private async runCleanupSafely() {
+    let acquired = false;
     try {
-      await this.cleanupExpiredScreenshots();
+      const lockResult = await this.prisma.$queryRaw<Array<{ acquired: boolean }>>`
+        SELECT pg_try_advisory_lock(${RETENTION_LOCK_ID}) AS acquired
+      `;
+      acquired = Boolean(lockResult[0]?.acquired);
+      if (!acquired) return;
+
+      for (let batch = 0; batch < 20; batch += 1) {
+        const deleted = await this.cleanupExpiredScreenshots();
+        if (deleted < CLEANUP_BATCH_SIZE) break;
+      }
     } catch (error) {
       this.logger.error('Automatic screenshot cleanup will retry later', error);
+    } finally {
+      if (acquired) {
+        await this.prisma.$queryRaw`
+          SELECT pg_advisory_unlock(${RETENTION_LOCK_ID})
+        `.catch((error) => {
+          this.logger.error('Could not release screenshot retention lock', error);
+        });
+      }
     }
   }
 

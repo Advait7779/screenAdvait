@@ -1,0 +1,81 @@
+name: screenadvait
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: screenadvait-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: screenadvait
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      POSTGRES_DB: screenadvait
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U screenadvait -d screenadvait"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - backend
+
+  api:
+    build:
+      context: .
+      dockerfile: services/api/Dockerfile
+    container_name: screenadvait-api
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      API_HOST: 0.0.0.0
+      PORT: 5000
+      TRUST_PROXY: "true"
+      DATABASE_URL: postgresql://screenadvait:${POSTGRES_PASSWORD}@postgres:5432/screenadvait?schema=public
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?Set JWT_REFRESH_SECRET}
+      CORS_ORIGINS: ${PUBLIC_ORIGIN:?Set PUBLIC_ORIGIN}
+      STORAGE_PROVIDER: local
+      LOCAL_STORAGE_PATH: /data/screenshots
+      SCREENSHOT_RETENTION_DAYS: ${SCREENSHOT_RETENTION_DAYS:-7}
+    volumes:
+      - screenshot_data:/data/screenshots
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:5000/api/v1/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - backend
+
+  portal:
+    build:
+      context: .
+      dockerfile: apps/admin-web/Dockerfile
+    container_name: screenadvait-portal
+    restart: unless-stopped
+    ports:
+      - "${PORTAL_PORT:-8080}:8080"
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - backend
+
+volumes:
+  postgres_data:
+  screenshot_data:
+
+networks:
+  backend:
+    driver: bridge

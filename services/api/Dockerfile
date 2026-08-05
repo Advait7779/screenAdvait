@@ -39,4 +39,4 @@ RUN mkdir -p /data/screenshots && chown -R screenadvait:screenadvait /data/scree
 USER screenadvait
 EXPOSE 5000
 
-CMD ["sh", "-c", "./node_modules/.bin/prisma migrate deploy --schema prisma/schema.prisma && node dist/src/main.js"]
+CMD ["sh", "-c", "npx prisma migrate deploy --schema prisma/schema.prisma && node dist/src/main.js"]

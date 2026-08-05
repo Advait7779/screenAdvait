@@ -3,6 +3,7 @@ FROM node:24-bookworm-slim AS builder
 ENV CI=true
 WORKDIR /app
 
+RUN apt-get update -y && apt-get install -y openssl ca-certificates && rm -rf /var/lib/apt/lists/*
 RUN corepack enable && corepack prepare pnpm@11.9.0 --activate
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc tsconfig.base.json ./
@@ -27,6 +28,8 @@ FROM node:24-bookworm-slim AS runner
 ENV NODE_ENV=production
 WORKDIR /app
 
+RUN apt-get update -y && apt-get install -y openssl ca-certificates && rm -rf /var/lib/apt/lists/*
+
 RUN groupadd --system --gid 10001 screenadvait \
   && useradd --system --uid 10001 --gid screenadvait --create-home screenadvait
 
@@ -39,4 +42,4 @@ RUN mkdir -p /data/screenshots && chown -R screenadvait:screenadvait /data/scree
 USER screenadvait
 EXPOSE 5000
 
-CMD ["sh", "-c", "echo '=== STARTING API ===' && echo '=== ENV CHECK ===' && echo \"NODE_ENV=$NODE_ENV\" && echo \"DATABASE_URL is set: $([ -n \"$DATABASE_URL\" ] && echo YES || echo NO)\" && echo \"JWT_SECRET length: $(echo -n \"$JWT_SECRET\" | wc -c)\" && echo \"CORS_ORIGINS=$CORS_ORIGINS\" && echo '=== PRISMA MIGRATE ===' && npx prisma migrate deploy --schema prisma/schema.prisma 2>&1 && echo '=== STARTING NODE ===' && node dist/src/main.js 2>&1 || (echo '=== API CRASHED ===' && sleep 600)"]
+CMD ["sh", "-c", "npx prisma migrate deploy --schema prisma/schema.prisma && node dist/src/main.js"]

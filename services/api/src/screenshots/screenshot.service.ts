@@ -84,7 +84,7 @@ export class ScreenshotService implements OnModuleInit {
     try {
       return await this.prisma.$transaction(
         async (tx) => {
-          await tx.$queryRaw`
+          await tx.$executeRaw`
             SELECT pg_advisory_xact_lock(hashtextextended(${user.companyId}, 0))
           `;
 
@@ -190,17 +190,23 @@ export class ScreenshotService implements OnModuleInit {
     requester: { id: string; companyId: string; role: Role },
   ) {
     const screenshot = await this.prisma.screenshot.findUnique({ where: { id: screenshotId } });
-    if (!screenshot) throw new NotFoundException('Screenshot not found');
+    if (!screenshot) throw new NotFoundException('Screenshot record not found');
     const permitted =
       requester.role === Role.SUPER_ADMIN ||
       (requester.role === Role.COMPANY_ADMIN && screenshot.companyId === requester.companyId) ||
       (requester.role === Role.EMPLOYEE && screenshot.userId === requester.id);
     if (!permitted) throw new ForbiddenException('You cannot access this screenshot');
-    return {
-      buffer: await this.storage.readFile(screenshot.driveFileId || screenshot.fileKey),
-      mimeType: screenshot.mimeType,
-      fileName: screenshot.fileName,
-    };
+
+    try {
+      const buffer = await this.storage.readFile(screenshot.driveFileId || screenshot.fileKey);
+      return {
+        buffer,
+        mimeType: screenshot.mimeType,
+        fileName: screenshot.fileName,
+      };
+    } catch (error: any) {
+      throw new NotFoundException('Screenshot image file is missing or deleted from storage');
+    }
   }
 
   private toResponse<T extends { id: string; fileSize: bigint }>(screenshot: T) {

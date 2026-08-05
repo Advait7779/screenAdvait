@@ -8,13 +8,12 @@
     "typecheck": "tsc --noEmit --incremental false"
   },
   "dependencies": {
-    "@screenadvait/shared-types": "workspace:*",
-    "@screenadvait/shared-utils": "workspace:*",
     "axios": "^1.7.4",
     "clsx": "^2.1.1",
     "lucide-react": "^0.439.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-router-dom": "^6.30.0",
     "tailwind-merge": "^2.5.2"
   },
   "devDependencies": {

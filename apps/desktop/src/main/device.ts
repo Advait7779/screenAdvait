@@ -5,13 +5,6 @@ import { getDb } from './sqlite.store.js';
 export function getDeviceDetails() {
   const computerName = os.hostname();
   const platform = `${os.type()} ${os.release()} (${os.arch()})`;
-  const networkIds = Object.values(os.networkInterfaces())
-    .flat()
-    .filter((entry) => entry && !entry.internal)
-    .map((entry) => entry!.mac)
-    .filter((mac) => mac && mac !== '00:00:00:00:00:00')
-    .sort()
-    .join('|');
   const db = getDb();
   const existing = db.prepare('SELECT value FROM local_settings WHERE key = ?').get('installationId') as
     | { value: string }
@@ -23,8 +16,9 @@ export function getDeviceDetails() {
       installationId,
     );
   }
-  const rawGuid = `${installationId}|${computerName}|${os.platform()}|${os.cpus()[0]?.model || 'CPU'}|${networkIds}`;
-  const machineGuid = crypto.createHash('sha256').update(rawGuid).digest('hex');
+  // Use only the stable installationId (stored UUID) — not volatile MAC addresses
+  // that change with VPN, network adapter changes, or Wi-Fi switches
+  const machineGuid = crypto.createHash('sha256').update(installationId).digest('hex');
   return {
     computerName,
     os: platform,
@@ -32,3 +26,4 @@ export function getDeviceDetails() {
     deviceId: `dev_${machineGuid.substring(0, 24)}`,
   };
 }
+

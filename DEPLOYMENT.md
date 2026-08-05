@@ -1,5 +1,7 @@
 # ScreenAdvait production deployment
 
+> For deploying with **Coolify** on Hostinger VPS, see the step-by-step guide in [COOLIFY_GUIDE.md](file:///a:/Projects/ScreenAdvait/COOLIFY_GUIDE.md).
+
 ## Before deployment
 
 1. Install Docker Desktop/Engine with Compose v2.

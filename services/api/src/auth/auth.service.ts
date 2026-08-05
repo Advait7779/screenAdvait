@@ -360,18 +360,16 @@ export class AuthService {
       async (tx) => {
         const existing = await tx.device.findUnique({ where: { deviceId } });
         if (existing) {
-          if (
-            existing.licenseId !== licenseId ||
-            existing.userId !== userId ||
-            existing.machineGuid !== machineGuid
-          ) {
+          // Block ONLY if the device belongs to a completely different user or license
+          if (existing.licenseId !== licenseId || existing.userId !== userId) {
             throw new ForbiddenException(
               'This device is already activated for another employee or its hardware identity changed',
             );
           }
+          // Same user + license: update (re-bind) even if machineGuid changed (e.g. OS update)
           await tx.device.update({
             where: { id: existing.id },
-            data: { lastSeenAt: new Date(), ipAddress, os, computerName },
+            data: { lastSeenAt: new Date(), ipAddress, os, computerName, machineGuid },
           });
           return;
         }

@@ -13,12 +13,14 @@ import {
 } from '@screenadvait/shared-utils';
 import { EntitlementService } from '../entitlements/entitlement.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { MailService } from '../mail/mail.service.js';
 
 @Injectable()
 export class CompanyAdminService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly entitlements: EntitlementService,
+    private readonly mail: MailService,
   ) {}
 
   async overview(companyId: string) {
@@ -161,6 +163,18 @@ export class CompanyAdminService {
 
       return { ...created, licenseKey: license.key };
     });
+
+    // Send welcome email — fire and forget (never blocks response)
+    const company = await this.prisma.company.findUnique({ where: { id: companyId } });
+    void this.mail.sendWelcomeEmail({
+      to: user.email,
+      fullName: user.fullName,
+      username: user.username,
+      password: input.password,
+      licenseKey: user.licenseKey,
+      companyName: company?.name ?? 'Your Company',
+    });
+
     return user;
   }
 
@@ -299,6 +313,17 @@ export class CompanyAdminService {
         },
       }),
     ]);
+
+    // Send password reset notification email
+    const company = await this.prisma.company.findUnique({ where: { id: companyId } });
+    void this.mail.sendPasswordResetEmail({
+      to: employee.email,
+      fullName: employee.fullName,
+      username: employee.username,
+      newPassword,
+      companyName: company?.name ?? 'Your Company',
+    });
+
     return { success: true };
   }
 
@@ -326,6 +351,7 @@ export class CompanyAdminService {
     const subscription = await this.entitlements.assertCompanyActive(companyId);
     const license = await this.prisma.license.findFirst({
       where: { id: licenseId, companyId, subscriptionId: subscription.id },
+      include: { user: true },
     });
     if (!license) throw new NotFoundException('Employee license key not found');
 
@@ -344,6 +370,19 @@ export class CompanyAdminService {
         },
       }),
     ]);
+
+    // Notify employee their license is active again
+    if (license.user) {
+      const company = await this.prisma.company.findUnique({ where: { id: companyId } });
+      void this.mail.sendLicenseReactivatedEmail({
+        to: license.user.email,
+        fullName: license.user.fullName,
+        username: license.user.username,
+        licenseKey: license.key,
+        companyName: company?.name ?? 'Your Company',
+      });
+    }
+
     return { success: true };
   }
 

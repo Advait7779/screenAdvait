@@ -5,78 +5,105 @@
 @layer base {
   html {
     scroll-behavior: smooth;
-  }
-  :root,
-  body,
-  #root,
-  *,
-  button,
-  input,
-  select,
-  textarea {
-    font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important;
+    color-scheme: dark;
   }
   body {
-    @apply bg-slate-50 text-slate-900 antialiased;
-    font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important;
-    min-width: 320px;
+    background-color: #070C18;
+    color: #E2E8F0;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    overflow-x: hidden;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    color: #F8FAFC;
+  }
+  * {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
   }
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+/* Custom Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #070C18; }
+::-webkit-scrollbar-thumb { background: #1E2D45; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #F59E0B; }
+
+/* Glassmorphism */
+.glass {
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.07);
 }
 
-@keyframes slideInRight {
-  from {
-    opacity: 0;
-    transform: translateX(30px) scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0) scale(1);
-  }
+.glass-light {
+  background: rgba(30, 41, 59, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-@keyframes popIn {
-  from {
-    opacity: 0;
-    transform: scale(0.94) translateY(4px);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
+/* Gold Gradient Text */
+.text-gold {
+  background: linear-gradient(135deg, #FBBF24 0%, #F59E0B 60%, #D97706 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
-@keyframes toastProgress {
-  from {
-    width: 100%;
-  }
-  to {
-    width: 0%;
-  }
+/* Gold Button */
+.btn-gold {
+  background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
+  color: #0F172A;
+  font-weight: 700;
+  transition: all 0.2s ease;
+  font-family: 'Inter', sans-serif;
+}
+.btn-gold:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 25px -5px rgba(245, 158, 11, 0.4);
+}
+.btn-gold:active { transform: translateY(0); }
+
+/* Outline Button */
+.btn-outline {
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  color: #F59E0B;
+  transition: all 0.2s ease;
+  font-family: 'Inter', sans-serif;
+}
+.btn-outline:hover {
+  background: rgba(245, 158, 11, 0.08);
+  border-color: #F59E0B;
 }
 
-.page-fade-in {
-  animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+/* Section Divider */
+.section-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(245, 158, 11, 0.3), transparent);
 }
 
-.toast-slide-in {
-  animation: slideInRight 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+/* Card Hover */
+.card-hover {
+  transition: all 0.25s ease;
+}
+.card-hover:hover {
+  transform: translateY(-3px);
+  border-color: rgba(245, 158, 11, 0.35) !important;
+  box-shadow: 0 12px 30px -8px rgba(0, 0, 0, 0.4);
 }
 
-.modal-pop-in {
-  animation: popIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+/* Fade In Animation */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0);    }
 }
+.fade-up { animation: fadeUp 0.5s ease forwards; }
 
-.toast-progress-bar {
-  animation: toastProgress 4s linear forwards;
+/* Glow Blob */
+.glow-blob {
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.12;
+  pointer-events: none;
 }

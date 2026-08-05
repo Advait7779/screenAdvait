@@ -10,12 +10,14 @@ import { EntitlementModule } from './entitlements/entitlement.module.js';
 import { SubscriptionModule } from './subscriptions/subscription.module.js';
 import { CompanyAdminModule } from './company-admin/company-admin.module.js';
 import { validateEnvironment } from './config/validate-env.js';
+import { MailModule } from './mail/mail.module.js';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, validate: validateEnvironment }),
     PrismaModule,
     EntitlementModule,
+    MailModule,
     AuthModule,
     LicenseModule,
     ScreenshotModule,
@@ -26,3 +28,4 @@ import { validateEnvironment } from './config/validate-env.js';
   controllers: [HealthController],
 })
 export class AppModule {}
+

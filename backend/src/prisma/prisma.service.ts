@@ -17,24 +17,14 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 
   private async ensureInitialSeed() {
     try {
-      const superAdminCount = await this.user.count({
-        where: { role: Role.SUPER_ADMIN },
-      });
+      this.logger.log('🌱 Checking / Initializing SuperAdmin credentials...');
 
-      const autoSeed = process.env.AUTO_SEED === 'true';
-
-      if (superAdminCount > 0 && !autoSeed) {
-        return;
-      }
-
-      this.logger.log('🌱 Ensuring initial SuperAdmin credentials & demo data...');
-
-      const superadminEmail = process.env.SUPERADMIN_EMAIL || 'superadmin@system.com';
+      const superadminEmail = (process.env.SUPERADMIN_EMAIL || 'superadmin@system.com').trim().toLowerCase();
       const superadminPassword = process.env.SUPERADMIN_PASSWORD || 'SuperAdmin@2026!';
-      const superadminUsername = process.env.SUPERADMIN_USERNAME || 'superadmin';
+      const superadminUsername = (process.env.SUPERADMIN_USERNAME || 'superadmin').trim();
       const seedLicenseKey = process.env.SEED_DEMO_LICENSE_KEY || 'SA-DEMO-2026-KEY-9999';
 
-      // 1. Create Default Company
+      // 1. Create / Ensure Default Company
       const company = await this.company.upsert({
         where: { code: 'DEMO' },
         update: {},
@@ -44,16 +34,21 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
           contactEmail: 'admin@demoenterprise.com',
           contactPhone: '+1-555-0192',
           maxUsers: 50,
-          maxStorageMb: BigInt(51200), // 50 GB
+          maxStorageMb: BigInt(51200),
         },
       });
 
       const passwordHash = await bcrypt.hash(superadminPassword, 12);
 
-      // 2. Create Super Admin User
+      // 2. Upsert Super Admin User (by email)
       const superAdmin = await this.user.upsert({
         where: { email: superadminEmail },
-        update: { passwordHash, username: superadminUsername, isActive: true },
+        update: {
+          passwordHash,
+          username: superadminUsername,
+          role: Role.SUPER_ADMIN,
+          isActive: true,
+        },
         create: {
           companyId: company.id,
           email: superadminEmail,
@@ -61,13 +56,14 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
           fullName: 'Super Administrator',
           passwordHash,
           role: Role.SUPER_ADMIN,
+          isActive: true,
         },
       });
 
-      // 3. Create Company Admin User
+      // 3. Ensure Company Admin User
       const companyAdmin = await this.user.upsert({
         where: { email: 'admin@demoenterprise.com' },
-        update: { passwordHash },
+        update: { passwordHash, isActive: true },
         create: {
           companyId: company.id,
           email: 'admin@demoenterprise.com',
@@ -75,13 +71,14 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
           fullName: 'John Enterprise Admin',
           passwordHash,
           role: Role.COMPANY_ADMIN,
+          isActive: true,
         },
       });
 
-      // 4. Create Employee User
+      // 4. Ensure Employee User
       const employee = await this.user.upsert({
         where: { email: 'employee1@demoenterprise.com' },
-        update: { passwordHash },
+        update: { passwordHash, isActive: true },
         create: {
           companyId: company.id,
           email: 'employee1@demoenterprise.com',
@@ -89,13 +86,14 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
           fullName: 'Alice Employee',
           passwordHash,
           role: Role.EMPLOYEE,
+          isActive: true,
         },
       });
 
-      // 5. Create Subscription & License
+      // 5. Ensure Subscription & License
       const issueDate = new Date();
       const expiryDate = new Date();
-      expiryDate.setFullYear(issueDate.getFullYear() + 1);
+      expiryDate.setFullYear(issueDate.getFullYear() + 10); // 10 years active
 
       const subscription =
         (await this.subscription.findFirst({
@@ -118,7 +116,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 
       await this.license.upsert({
         where: { key: seedLicenseKey },
-        update: { userId: employee.id, subscriptionId: subscription.id },
+        update: { userId: employee.id, subscriptionId: subscription.id, status: LicenseStatus.ACTIVE },
         create: {
           key: seedLicenseKey,
           companyId: company.id,
@@ -133,9 +131,13 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
         },
       });
 
-      this.logger.log(`✅ SuperAdmin initialized successfully! Email: ${superadminEmail}`);
+      this.logger.log('======================================================');
+      this.logger.log('✅ SuperAdmin Initialized & Verified Successfully!');
+      this.logger.log(`   Username: ${superadminUsername}`);
+      this.logger.log(`   Email:    ${superadminEmail}`);
+      this.logger.log('======================================================');
     } catch (error) {
-      this.logger.error('Failed to auto-seed initial superadmin credentials:', error);
+      this.logger.error('CRITICAL: Failed to auto-seed initial superadmin credentials:', error);
     }
   }
 }

@@ -2,6 +2,8 @@ import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/comm
 import { AuthGuard } from '@nestjs/passport';
 import { Role } from '@prisma/client';
 import {
+  ConfigureDriveConnectionInput,
+  ConfigureDriveConnectionSchema,
   CreateEmployeeLicenseInput,
   CreateEmployeeLicenseSchema,
   CreateManagedEmployeeInput,
@@ -96,5 +98,33 @@ export class CompanyAdminController {
   @Post('licenses/:licenseId/reactivate')
   reactivate(@Param('licenseId') licenseId: string, @Req() req: any) {
     return this.companyAdmin.reactivateEmployeeLicense(req.user.companyId, req.user.id, licenseId);
+  }
+
+  @Get('drive-connection')
+  getDriveConnection(@Req() req: any) {
+    return this.companyAdmin.getDriveConnection(req.user.companyId);
+  }
+
+  @Post('drive-connection')
+  configureDriveConnection(
+    @Body(new ZodValidationPipe(ConfigureDriveConnectionSchema))
+    body: ConfigureDriveConnectionInput,
+    @Req() req: any,
+  ) {
+    return this.companyAdmin.configureDriveConnection(
+      req.user.companyId,
+      req.user.id,
+      body,
+    );
+  }
+
+  @Post('drive-connection/test')
+  testDriveConnection(@Req() req: any) {
+    return this.companyAdmin.testDriveConnection(req.user.companyId);
+  }
+
+  @Post('drive-connection/disconnect')
+  disconnectDriveConnection(@Req() req: any) {
+    return this.companyAdmin.disconnectDriveConnection(req.user.companyId);
   }
 }

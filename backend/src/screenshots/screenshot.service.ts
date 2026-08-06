@@ -10,6 +10,7 @@ import * as crypto from 'crypto';
 import { EntitlementService } from '../entitlements/entitlement.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { GoogleDriveService } from './google-drive.service.js';
+import { decryptText } from '../common/crypto.util.js';
 
 @Injectable()
 export class ScreenshotService implements OnModuleInit {
@@ -260,5 +261,124 @@ export class ScreenshotService implements OnModuleInit {
       (mimeType === 'image/jpeg' && jpeg) ||
       (mimeType === 'image/webp' && webp);
     if (!valid) throw new BadRequestException('File content does not match the declared image type');
+  }
+
+  async getCompanyDriveConfig(companyId: string) {
+    const conn = await this.prisma.googleDriveConnection.findUnique({
+      where: { companyId },
+    });
+    if (!conn) {
+      const systemClientId = process.env.GOOGLE_DRIVE_CLIENT_ID;
+      const systemClientSecret = process.env.GOOGLE_DRIVE_CLIENT_SECRET;
+      const systemRefreshToken = process.env.GOOGLE_DRIVE_REFRESH_TOKEN;
+      if (systemClientId && systemClientSecret && systemRefreshToken && !systemClientId.startsWith('mock-')) {
+        return {
+          enabled: true,
+          provider: 'google-drive',
+          clientId: systemClientId,
+          clientSecret: systemClientSecret,
+          refreshToken: systemRefreshToken,
+          rootFolderId: process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID || null,
+          rootFolderName: process.env.GOOGLE_DRIVE_ROOT_FOLDER_NAME || 'ScreenAdvait Screenshots',
+        };
+      }
+      return { enabled: false, provider: 'none' };
+    }
+
+    try {
+      const decryptedJson = decryptText(conn.refreshTokenEncrypted);
+      const parsed = JSON.parse(decryptedJson);
+      return {
+        enabled: true,
+        provider: 'google-drive',
+        clientId: parsed.clientId || process.env.GOOGLE_DRIVE_CLIENT_ID,
+        clientSecret: parsed.clientSecret || process.env.GOOGLE_DRIVE_CLIENT_SECRET,
+        refreshToken: parsed.refreshToken,
+        rootFolderId: conn.rootFolderId,
+        rootFolderName: conn.rootFolderName,
+      };
+    } catch (e) {
+      return { enabled: false, provider: 'none', error: 'Failed to decrypt drive connection' };
+    }
+  }
+
+  async processDirectMetadata(meta: {
+    userId: string;
+    companyId: string;
+    deviceId: string;
+    capturedAt: string;
+    idempotencyKey: string;
+    timezoneOffsetMinutes: number;
+    driveFileId: string;
+    driveViewUrl: string;
+    fileName: string;
+    fileSize: number;
+    mimeType: string;
+  }) {
+    const capturedDate = new Date(meta.capturedAt);
+    if (Number.isNaN(capturedDate.getTime()) || capturedDate.getTime() > Date.now() + 15 * 60_000) {
+      throw new BadRequestException('Invalid capture timestamp');
+    }
+
+    const user = await this.prisma.user.findFirst({
+      where: { id: meta.userId, companyId: meta.companyId, isActive: true },
+      include: { company: true },
+    });
+    if (!user) throw new NotFoundException('Active user not found');
+
+    const normalizedIdempotencyKey = crypto
+      .createHash('sha256')
+      .update(`${meta.userId}:${meta.idempotencyKey}`)
+      .digest('hex');
+
+    const existingUpload = await this.prisma.screenshot.findUnique({
+      where: { idempotencyKey: normalizedIdempotencyKey },
+    });
+    if (existingUpload) return this.toUploadResponse(existingUpload);
+
+    const device = await this.prisma.device.findFirst({
+      where: { deviceId: meta.deviceId, userId: user.id },
+      include: { license: true },
+    });
+
+    if (!device || device.license.companyId !== user.companyId) {
+      throw new ForbiddenException('Device is not activated under a valid license');
+    }
+
+    await this.entitlements.assertLicenseActive(device.license.id);
+    await this.prisma.device.update({
+      where: { id: device.id },
+      data: { lastSeenAt: new Date() },
+    });
+
+    const localCaptureDate = new Date(
+      capturedDate.getTime() + meta.timezoneOffsetMinutes * 60_000,
+    );
+    const year = localCaptureDate.getUTCFullYear();
+    const month = localCaptureDate.getUTCMonth() + 1;
+    const day = localCaptureDate.getUTCDate();
+
+    const screenshot = await this.prisma.screenshot.create({
+      data: {
+        companyId: user.companyId,
+        userId: user.id,
+        deviceId: device.id,
+        fileKey: meta.driveFileId,
+        fileName: meta.fileName,
+        fileSize: BigInt(meta.fileSize),
+        mimeType: meta.mimeType || 'image/png',
+        uploadStatus: UploadStatus.COMPLETED,
+        driveFileId: meta.driveFileId,
+        driveViewUrl: meta.driveViewUrl,
+        idempotencyKey: normalizedIdempotencyKey,
+        capturedAt: capturedDate,
+        timezoneOffsetMinutes: meta.timezoneOffsetMinutes,
+        year,
+        month,
+        day,
+      },
+    });
+
+    return this.toUploadResponse(screenshot);
   }
 }

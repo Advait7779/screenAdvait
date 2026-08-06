@@ -27,6 +27,42 @@ import { ScreenshotService } from './screenshot.service.js';
 export class ScreenshotController {
   constructor(private readonly screenshotService: ScreenshotService) {}
 
+  @Get('drive-config')
+  getDriveConfig(@Req() req: any) {
+    return this.screenshotService.getCompanyDriveConfig(req.user.companyId);
+  }
+
+  @Post('metadata')
+  async uploadMetadata(
+    @Body()
+    body: {
+      deviceId: string;
+      capturedAt: string;
+      idempotencyKey: string;
+      timezoneOffsetMinutes: number;
+      driveFileId: string;
+      driveViewUrl: string;
+      fileName: string;
+      fileSize: number;
+      mimeType?: string;
+    },
+    @Req() req: any,
+  ) {
+    return this.screenshotService.processDirectMetadata({
+      userId: req.user.id,
+      companyId: req.user.companyId,
+      deviceId: body.deviceId,
+      capturedAt: body.capturedAt,
+      idempotencyKey: body.idempotencyKey,
+      timezoneOffsetMinutes: body.timezoneOffsetMinutes,
+      driveFileId: body.driveFileId,
+      driveViewUrl: body.driveViewUrl,
+      fileName: body.fileName,
+      fileSize: body.fileSize,
+      mimeType: body.mimeType || 'image/png',
+    });
+  }
+
   @Post('upload')
   @UseInterceptors(
     FileInterceptor('file', {

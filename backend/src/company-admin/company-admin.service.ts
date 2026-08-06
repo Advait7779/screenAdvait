@@ -13,6 +13,8 @@ import {
 } from '@screenadvait/shared-utils';
 import { EntitlementService } from '../entitlements/entitlement.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { google } from 'googleapis';
+import { encryptText, decryptText } from '../common/crypto.util.js';
 import { MailService } from '../mail/mail.service.js';
 
 @Injectable()
@@ -488,5 +490,135 @@ export class CompanyAdminService {
       }),
     ]);
     return { success: true };
+  }
+
+  async getDriveConnection(companyId: string) {
+    const conn = await this.prisma.googleDriveConnection.findUnique({
+      where: { companyId },
+    });
+    if (!conn) {
+      return { connected: false, accountEmail: null, rootFolderName: null, lastVerifiedAt: null };
+    }
+    return {
+      connected: true,
+      accountEmail: conn.accountEmail,
+      rootFolderName: conn.rootFolderName,
+      lastVerifiedAt: conn.lastVerifiedAt.toISOString(),
+      connectedAt: conn.connectedAt.toISOString(),
+    };
+  }
+
+  async configureDriveConnection(
+    companyId: string,
+    adminUserId: string,
+    input: { clientId?: string; clientSecret?: string; refreshToken: string; rootFolderName?: string },
+  ) {
+    const clientId = input.clientId?.trim() || process.env.GOOGLE_DRIVE_CLIENT_ID;
+    const clientSecret = input.clientSecret?.trim() || process.env.GOOGLE_DRIVE_CLIENT_SECRET;
+    const refreshToken = input.refreshToken.trim();
+
+    if (!clientId || !clientSecret) {
+      throw new ForbiddenException(
+        'Google Client ID and Client Secret are required. Provide them or configure server credentials.',
+      );
+    }
+
+    const oauth2Client = new google.auth.OAuth2(clientId, clientSecret);
+    oauth2Client.setCredentials({ refresh_token: refreshToken });
+    const drive = google.drive({ version: 'v3', auth: oauth2Client });
+
+    let accountEmail: string | null = null;
+    let rootFolderId: string;
+    const rootFolderName = input.rootFolderName?.trim() || 'ScreenAdvait Screenshots';
+
+    try {
+      const about = await drive.about.get({ fields: 'user(emailAddress)' });
+      accountEmail = about.data.user?.emailAddress || null;
+
+      const escapedName = rootFolderName.replace(/['\\]/g, '\\$&');
+      const existingFolder = await drive.files.list({
+        q: `name='${escapedName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+        fields: 'files(id)',
+        pageSize: 1,
+      });
+
+      if (existingFolder.data.files?.[0]?.id) {
+        rootFolderId = existingFolder.data.files[0].id;
+      } else {
+        const createdFolder = await drive.files.create({
+          requestBody: {
+            name: rootFolderName,
+            mimeType: 'application/vnd.google-apps.folder',
+          },
+          fields: 'id',
+        });
+        if (!createdFolder.data.id) throw new Error('Could not create Google Drive root folder');
+        rootFolderId = createdFolder.data.id;
+      }
+    } catch (err: any) {
+      throw new ForbiddenException(
+        `Google Drive verification failed: ${err?.message || 'Invalid Refresh Token or Client credentials'}`,
+      );
+    }
+
+    const encryptedToken = encryptText(JSON.stringify({ refreshToken, clientId, clientSecret }));
+
+    const connection = await this.prisma.googleDriveConnection.upsert({
+      where: { companyId },
+      create: {
+        companyId,
+        connectedByUserId: adminUserId,
+        refreshTokenEncrypted: encryptedToken,
+        rootFolderId,
+        rootFolderName,
+        accountEmail,
+        connectedAt: new Date(),
+        lastVerifiedAt: new Date(),
+      },
+      update: {
+        connectedByUserId: adminUserId,
+        refreshTokenEncrypted: encryptedToken,
+        rootFolderId,
+        rootFolderName,
+        accountEmail,
+        lastVerifiedAt: new Date(),
+      },
+    });
+
+    return {
+      connected: true,
+      accountEmail: connection.accountEmail,
+      rootFolderName: connection.rootFolderName,
+      lastVerifiedAt: connection.lastVerifiedAt.toISOString(),
+    };
+  }
+
+  async testDriveConnection(companyId: string) {
+    const conn = await this.prisma.googleDriveConnection.findUnique({
+      where: { companyId },
+    });
+    if (!conn) throw new NotFoundException('No Google Drive connection configured for this company');
+
+    try {
+      const { refreshToken, clientId, clientSecret } = JSON.parse(decryptText(conn.refreshTokenEncrypted));
+      const oauth2Client = new google.auth.OAuth2(clientId, clientSecret);
+      oauth2Client.setCredentials({ refresh_token: refreshToken });
+      const drive = google.drive({ version: 'v3', auth: oauth2Client });
+      const about = await drive.about.get({ fields: 'user(emailAddress)' });
+      await this.prisma.googleDriveConnection.update({
+        where: { id: conn.id },
+        data: { lastVerifiedAt: new Date(), accountEmail: about.data.user?.emailAddress || conn.accountEmail },
+      });
+      return { success: true, accountEmail: about.data.user?.emailAddress || conn.accountEmail };
+    } catch (error: any) {
+      throw new ForbiddenException(`Drive health check failed: ${error?.message || 'Token expired'}`);
+    }
+  }
+
+  async disconnectDriveConnection(companyId: string) {
+    await this.prisma.googleDriveConnection.deleteMany({
+      where: { companyId },
+    });
+    return { connected: false };
   }
 }

@@ -128,3 +128,13 @@ export const ScreenshotUploadMetadataSchema = z.object({
   idempotencyKey: z.string().min(16).max(200),
   timezoneOffsetMinutes: z.coerce.number().int().min(-840).max(840),
 });
+
+export const ConfigureDriveConnectionSchema = z.object({
+  clientId: z.string().optional(),
+  clientSecret: z.string().optional(),
+  refreshToken: z.string().min(10, 'Google Drive Refresh Token is required'),
+  rootFolderName: z.string().optional().default('ScreenAdvait Screenshots'),
+});
+
+export type ConfigureDriveConnectionInput = z.infer<typeof ConfigureDriveConnectionSchema>;
+

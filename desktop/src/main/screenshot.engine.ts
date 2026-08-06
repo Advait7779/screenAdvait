@@ -13,6 +13,7 @@ import {
 } from './session.store.js';
 import { getDeviceDetails } from './device.js';
 import { getApiUrl } from './ipc.js';
+import { uploadDirectToGoogleDrive } from './google-drive-client.js';
 
 let captureTimer: NodeJS.Timeout | null = null;
 let uploadTimer: NodeJS.Timeout | null = null;
@@ -308,6 +309,59 @@ export async function processPendingUploads() {
 }
 
 async function upload(item: any, token: string) {
+  // Check if company Google Drive is configured
+  let driveConfigRes;
+  try {
+    driveConfigRes = await axios.get(`${getApiUrl()}/screenshots/drive-config`, {
+      headers: { Authorization: `Bearer ${token}` },
+      timeout: 10_000,
+    });
+  } catch {
+    // If drive-config request fails, fall back to standard binary upload
+  }
+
+  const driveConfig = driveConfigRes?.data;
+  if (driveConfig?.enabled && driveConfig?.refreshToken) {
+    const session = getSession();
+    const employeeName = safeEmployeeFolder(session?.user?.username);
+
+    // Upload file directly from employee PC to company Google Drive
+    const directResult = await uploadDirectToGoogleDrive(
+      driveConfig,
+      item.file_path,
+      item.file_name,
+      item.mime_type || 'image/png',
+      employeeName,
+      item.captured_at,
+    );
+
+    // Notify backend server with Google Drive metadata (0 server storage used!)
+    const metadataRes = await axios.post(
+      `${getApiUrl()}/screenshots/metadata`,
+      {
+        deviceId: getDeviceDetails().deviceId,
+        capturedAt: item.captured_at,
+        idempotencyKey: item.id,
+        timezoneOffsetMinutes: -new Date(item.captured_at).getTimezoneOffset(),
+        driveFileId: directResult.fileId,
+        driveViewUrl: directResult.viewUrl,
+        fileName: item.file_name,
+        fileSize: item.file_size,
+        mimeType: item.mime_type || 'image/png',
+      },
+      {
+        headers: { Authorization: `Bearer ${token}` },
+        timeout: 15_000,
+      },
+    );
+
+    // Clean up local PNG file immediately after verified upload
+    fs.rmSync(item.file_path, { force: true });
+
+    return metadataRes;
+  }
+
+  // Fallback: Upload binary to server
   const fileBuffer = fs.readFileSync(item.file_path);
   const blob = new Blob([fileBuffer], { type: item.mime_type || 'image/png' });
   const form = new FormData();

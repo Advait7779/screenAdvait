@@ -37,4 +37,4 @@ COPY docker/nginx.conf /etc/nginx/templates/default.conf.template
 
 ENV BACKEND_URL=http://api:5000
 
-EXPOSE 8080
+EXPOSE 3008

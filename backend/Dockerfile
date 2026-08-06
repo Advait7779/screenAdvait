@@ -44,6 +44,6 @@ COPY --from=builder --chown=screenadvait:screenadvait /app/prisma ./prisma
 RUN mkdir -p /data/screenshots && chown -R screenadvait:screenadvait /data/screenshots
 
 USER screenadvait
-EXPOSE 5000
+EXPOSE 5008
 
 CMD ["sh", "-c", "npx prisma migrate deploy --schema prisma/schema.prisma && node dist/src/main.js"]

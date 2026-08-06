@@ -731,19 +731,18 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
 
             {/* ── KPI Cards ────────────────────────────────────────── */}
             <div className="mb-6 grid grid-cols-2 lg:grid-cols-4 gap-4">
-                {kpiItems.map(({ label, value, icon, accent, border }) => (
-                  <div key={label} className="bg-white rounded-md shadow-sm border border-gray-200 p-4 sm:p-5 flex items-start gap-3 hover:shadow-md transition-shadow">
-                    <div className="rounded-md p-2.5 shrink-0" style={{ background: accent, border: `1px solid ${border}` }}>
-                      {icon}
-                    </div>
-                    <div className="min-w-0">
-                      <div className="text-xs text-gray-500 font-medium truncate">{label}</div>
-                      <div className="text-base sm:text-lg font-bold text-gray-900 mt-0.5 break-words">{value}</div>
-                    </div>
+              {kpiItems.map(({ label, value, icon, accent, border }) => (
+                <div key={label} className="bg-white rounded-md shadow-sm border border-gray-200 p-4 sm:p-5 flex items-start gap-3 hover:shadow-md transition-shadow">
+                  <div className="rounded-md p-2.5 shrink-0" style={{ background: accent, border: `1px solid ${border}` }}>
+                    {icon}
                   </div>
-                ))}
-              </div>
-            )}
+                  <div className="min-w-0">
+                    <div className="text-xs text-gray-500 font-medium truncate">{label}</div>
+                    <div className="text-base sm:text-lg font-bold text-gray-900 mt-0.5 break-words">{value}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
 
             {/* ── Captures view ────────────────────────────────────── */}
             {view === 'captures' ? (

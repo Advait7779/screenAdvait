@@ -166,7 +166,7 @@ interface CustomerDashboardProps {
 export function CustomerDashboard({ token, session, onLogout }: CustomerDashboardProps) {
   const [screenshots, setScreenshots] = useState<any[]>([]);
   const [overview, setOverview] = useState<any>(null);
-  const [view, setView] = useState<'captures' | 'all-screenshots' | 'employees' | 'drive-settings'>('employees');
+  const [view, setView] = useState<'captures' | 'all-screenshots' | 'employees'>('employees');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [messageIsError, setMessageIsError] = useState(false);
@@ -510,7 +510,6 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
     { id: 'employees' as const, label: 'Employees & Keys', icon: <IconEmployees />, iconColor: '#60a5fa' },
     { id: 'captures' as const, label: 'Employee Captures', icon: <IconCaptures />, iconColor: '#4ade80' },
     { id: 'all-screenshots' as const, label: 'All Screenshots', icon: <IconAllScreenshots />, iconColor: '#a78bfa' },
-    { id: 'drive-settings' as const, label: 'Google Drive Storage', icon: <Folder className="w-4.5 h-4.5" />, iconColor: '#34d399' },
   ];
 
   const kpiItems = [
@@ -600,7 +599,7 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
               <span className="text-gray-400 hidden sm:inline truncate max-w-[120px]">{session?.company?.name}</span>
               <ChevronRight className="w-3.5 h-3.5 text-gray-300 hidden sm:inline shrink-0" />
               <span className="font-semibold text-gray-800 truncate">
-                {view === 'captures' ? 'Employee Captures' : view === 'all-screenshots' ? 'All Screenshots' : view === 'drive-settings' ? 'Google Drive Storage' : 'Employees & Keys'}
+                {view === 'captures' ? 'Employee Captures' : view === 'all-screenshots' ? 'All Screenshots' : 'Employees & Keys'}
               </span>
             </div>
           </div>
@@ -706,10 +705,10 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
             {/* Page title */}
             <div className="mb-6">
               <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
-                {view === 'captures' ? 'Employee Screenshot Management' : view === 'all-screenshots' ? 'All Employee Screenshots' : view === 'drive-settings' ? 'Google Drive Storage Settings' : 'Employees & License Keys'}
+                {view === 'captures' ? 'Employee Screenshot Management' : view === 'all-screenshots' ? 'All Employee Screenshots' : 'Employees & License Keys'}
               </h1>
               <p className="text-sm text-gray-500 mt-0.5">
-                {view === 'captures' ? 'Review latest team desktop activity captures.' : view === 'all-screenshots' ? 'Full organization screenshot archive with search & custom pagination.' : view === 'drive-settings' ? 'Configure your company Google Drive account to store employee screenshots directly in your cloud.' : 'Create employees and issue one-time activation keys for the desktop app.'}
+                {view === 'captures' ? 'Review latest team desktop activity captures.' : view === 'all-screenshots' ? 'Full organization screenshot archive with search & custom pagination.' : 'Create employees and issue one-time activation keys for the desktop app.'}
               </p>
             </div>
 
@@ -731,8 +730,7 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
             )}
 
             {/* ── KPI Cards ────────────────────────────────────────── */}
-            {view !== 'drive-settings' && (
-              <div className="mb-6 grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="mb-6 grid grid-cols-2 lg:grid-cols-4 gap-4">
                 {kpiItems.map(({ label, value, icon, accent, border }) => (
                   <div key={label} className="bg-white rounded-md shadow-sm border border-gray-200 p-4 sm:p-5 flex items-start gap-3 hover:shadow-md transition-shadow">
                     <div className="rounded-md p-2.5 shrink-0" style={{ background: accent, border: `1px solid ${border}` }}>
@@ -1067,146 +1065,6 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
                     </>
                   );
                 })()}
-              </section>
-            ) : view === 'drive-settings' ? (
-              <section className="space-y-6">
-                <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
-                  <div className="flex items-center justify-between border-b border-gray-100 pb-4 mb-6">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-green-50 border border-green-100 flex items-center justify-center">
-                        <Folder className="w-5 h-5 text-green-700" />
-                      </div>
-                      <div>
-                        <h2 className="text-base font-bold text-gray-900">Google Drive Cloud Storage Settings</h2>
-                        <p className="text-xs text-gray-500">Connect your company Google Drive account to receive employee screenshots directly in your cloud</p>
-                      </div>
-                    </div>
-                    {driveConn?.connected ? (
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
-                        <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                        Connected & Active
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600 border border-gray-200">
-                        Not Connected
-                      </span>
-                    )}
-                  </div>
-
-                  {driveConn?.connected ? (
-                    <div className="space-y-4">
-                      <div className="bg-green-50/70 border border-green-200 rounded-md p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <div>
-                          <div className="text-xs font-semibold text-green-900">
-                            Connected Google Account: <span className="font-mono text-green-950 font-bold">{driveConn.accountEmail || 'Company Google Drive'}</span>
-                          </div>
-                          <div className="text-xs text-green-700 mt-1">
-                            Target Root Folder: <span className="font-bold">{driveConn.rootFolderName}</span>
-                          </div>
-                          {driveConn.lastVerifiedAt && (
-                            <div className="text-[11px] text-green-600 mt-1">
-                              Last Health Check: {new Date(driveConn.lastVerifiedAt).toLocaleString()}
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={handleTestDrive}
-                            disabled={driveTesting}
-                            className="px-3.5 py-2 rounded-md border border-green-300 bg-white text-xs font-semibold text-green-800 hover:bg-green-50 transition-all shadow-sm flex items-center gap-1.5 disabled:opacity-50"
-                          >
-                            <RefreshCw className={`w-3.5 h-3.5 ${driveTesting ? 'animate-spin' : ''}`} />
-                            Test Health
-                          </button>
-                          <button
-                            onClick={handleDisconnectDrive}
-                            className="px-3.5 py-2 rounded-md border border-red-200 bg-white text-xs font-semibold text-red-600 hover:bg-red-50 transition-all shadow-sm"
-                          >
-                            Disconnect
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <form onSubmit={handleSaveDrive} className="space-y-4 max-w-xl">
-                      <div>
-                        <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
-                          Google Drive Refresh Token *
-                        </label>
-                        <input
-                          type="password"
-                          required
-                          value={driveRefreshToken}
-                          onChange={(e) => setDriveRefreshToken(e.target.value)}
-                          placeholder="Paste OAuth Refresh Token..."
-                          className="w-full bg-gray-50 border border-gray-200 rounded-md px-3 py-2.5 text-xs text-gray-900 font-mono focus:outline-none focus:border-green-600 focus:ring-1 focus:ring-green-600"
-                        />
-                        <p className="text-[11px] text-gray-400 mt-1">
-                          Refresh Token generated for your company Google Drive account.
-                        </p>
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
-                            Client ID (Optional)
-                          </label>
-                          <input
-                            type="text"
-                            value={driveClientId}
-                            onChange={(e) => setDriveClientId(e.target.value)}
-                            placeholder="Leave empty for default"
-                            className="w-full bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-xs text-gray-900 focus:outline-none focus:border-green-600"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
-                            Client Secret (Optional)
-                          </label>
-                          <input
-                            type="password"
-                            value={driveClientSecret}
-                            onChange={(e) => setDriveClientSecret(e.target.value)}
-                            placeholder="Leave empty for default"
-                            className="w-full bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-xs text-gray-900 focus:outline-none focus:border-green-600"
-                          />
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
-                          Root Folder Name
-                        </label>
-                        <input
-                          type="text"
-                          value={driveRootFolder}
-                          onChange={(e) => setDriveRootFolder(e.target.value)}
-                          placeholder="ScreenAdvait Screenshots"
-                          className="w-full bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-xs text-gray-900 focus:outline-none focus:border-green-600"
-                        />
-                      </div>
-
-                      <button
-                        type="submit"
-                        disabled={driveLoading}
-                        style={{ background: 'linear-gradient(135deg, #15803d, #166534)' }}
-                        className="px-5 py-2.5 text-white font-semibold text-xs rounded-md shadow-sm transition-all flex items-center gap-2 disabled:opacity-50"
-                      >
-                        {driveLoading ? (
-                          <>
-                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                            <span>Verifying & Connecting...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Check className="w-3.5 h-3.5" />
-                            <span>Save & Connect Drive</span>
-                          </>
-                        )}
-                      </button>
-                    </form>
-                  )}
-                </div>
               </section>
             ) : (
               <>

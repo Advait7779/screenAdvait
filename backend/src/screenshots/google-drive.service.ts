@@ -25,12 +25,9 @@ export class GoogleDriveService {
 
   private initDriveClient() {
     const provider = (process.env.STORAGE_PROVIDER || 'local').trim().toLowerCase();
-    if (provider === 'local') {
-      this.logger.log(`Drive for Desktop/local storage is active at ${this.localRoot}`);
-      return;
-    }
     if (provider !== 'google-drive') {
-      throw new Error('STORAGE_PROVIDER must be either "local" or "google-drive"');
+      this.logger.log(`Server local disk storage is active at ${this.localRoot}`);
+      return;
     }
     const clientId = process.env.GOOGLE_DRIVE_CLIENT_ID;
     const clientSecret = process.env.GOOGLE_DRIVE_CLIENT_SECRET;

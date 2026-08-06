@@ -19,6 +19,7 @@ import {
   Users,
   XCircle,
   LogOut,
+  Trash2,
 } from 'lucide-react';
 import axios from 'axios';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -204,6 +205,7 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
     password: '',
   });
   const [passwordResetTarget, setPasswordResetTarget] = useState<any>(null);
+  const [deleteTarget, setDeleteTarget] = useState<any>(null);
   const [replacementPassword, setReplacementPassword] = useState('');
 
   const addToast = (text: string, type: 'success' | 'error' | 'info' = 'success') => {
@@ -284,6 +286,20 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
       await fetchCustomerData();
     } catch (error: any) {
       show(apiErrorMessage(error, 'Could not update employee status'), true);
+    }
+  };
+
+  const deleteEmployee = async (item: any) => {
+    try {
+      await axios.post(
+        `${API_URL}/company-admin/employees/${item.id}/delete`,
+        {},
+        auth(token),
+      );
+      show(`Employee ${item.fullName || item.username} permanently deleted.`);
+      await fetchCustomerData();
+    } catch (error: any) {
+      show(apiErrorMessage(error, 'Could not delete employee'), true);
     }
   };
 
@@ -1169,6 +1185,14 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
                                       >
                                         {item.isActive ? 'Disable' : 'Enable'}
                                       </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setDeleteTarget(item)}
+                                        className="rounded-md border border-red-200 px-2.5 py-1.5 text-xs text-red-600 hover:bg-red-50 transition-colors"
+                                      >
+                                        <Trash2 className="mr-1 inline h-3 w-3" />
+                                        Delete
+                                      </button>
                                     </td>
                                   </tr>
                                 );
@@ -1221,6 +1245,51 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
         onCancel={() => setLogoutConfirmationOpen(false)}
         onConfirm={performLogout}
       />
+      {deleteTarget && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/55 p-4"
+          role="dialog"
+          aria-modal="true"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setDeleteTarget(null);
+          }}
+        >
+          <div className="w-full max-w-md rounded-lg border border-gray-200 bg-white p-6 shadow-2xl">
+            <div className="flex items-center gap-3 text-red-600 mb-3">
+              <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center shrink-0">
+                <Trash2 className="h-5 w-5 text-red-600" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-gray-900">Delete Employee Account</h2>
+                <p className="text-xs text-gray-500">Permanent Removal & License Slot Release</p>
+              </div>
+            </div>
+            <p className="text-xs text-gray-600 mb-5 leading-relaxed">
+              Are you sure you want to permanently delete employee <strong className="text-gray-900">{deleteTarget.fullName || deleteTarget.username}</strong> ({deleteTarget.email})? This action cannot be undone and will immediately release their license slot.
+            </p>
+            <div className="flex justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setDeleteTarget(null)}
+                className="rounded-md border border-gray-200 px-3.5 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const target = deleteTarget;
+                  setDeleteTarget(null);
+                  await deleteEmployee(target);
+                }}
+                className="rounded-md bg-red-600 px-4 py-2 text-xs font-semibold text-white hover:bg-red-700 shadow-sm transition-colors"
+              >
+                Permanently Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {passwordResetTarget && (
         <div
           className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/55 p-4"

@@ -78,6 +78,11 @@ export class CompanyAdminController {
     );
   }
 
+  @Post('employees/:employeeId/delete')
+  deleteEmployee(@Param('employeeId') employeeId: string, @Req() req: any) {
+    return this.companyAdmin.deleteEmployee(req.user.companyId, req.user.id, employeeId);
+  }
+
   @Post('licenses/:licenseId/reset-devices')
   resetDevices(@Param('licenseId') licenseId: string, @Req() req: any) {
     return this.companyAdmin.resetDevices(req.user.companyId, req.user.id, licenseId);

@@ -327,6 +327,50 @@ export class CompanyAdminService {
     return { success: true };
   }
 
+  async deleteEmployee(companyId: string, adminUserId: string, employeeId: string) {
+    const employee = await this.prisma.user.findFirst({
+      where: { id: employeeId, companyId, role: Role.EMPLOYEE },
+    });
+    if (!employee) throw new NotFoundException('Employee not found');
+
+    await this.prisma.$transaction(async (tx) => {
+      // Find licenses assigned to this employee
+      const licenses = await tx.license.findMany({
+        where: { userId: employeeId, companyId },
+        select: { id: true },
+      });
+      const licenseIds = licenses.map((l) => l.id);
+
+      // Clean up devices attached to employee's licenses or user
+      if (licenseIds.length > 0) {
+        await tx.device.deleteMany({ where: { licenseId: { in: licenseIds } } });
+      }
+      await tx.device.deleteMany({ where: { userId: employeeId } });
+
+      // Delete assigned licenses to free up slots
+      await tx.license.deleteMany({ where: { userId: employeeId } });
+
+      // Delete login logs
+      await tx.loginLog.deleteMany({ where: { userId: employeeId } });
+
+      // Delete user
+      await tx.user.delete({ where: { id: employeeId } });
+
+      // Audit log
+      await tx.auditLog.create({
+        data: {
+          companyId,
+          userId: adminUserId,
+          action: 'EMPLOYEE_DELETED',
+          entity: 'User',
+          entityId: employeeId,
+        },
+      });
+    });
+
+    return { success: true, message: 'Employee permanently deleted' };
+  }
+
   async resetDevices(
     companyId: string,
     adminUserId: string,

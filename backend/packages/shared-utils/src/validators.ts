@@ -31,11 +31,7 @@ export const ChangePasswordSchema = z.object({
   currentPassword: z.string().min(6),
   newPassword: z
     .string()
-    .min(12, 'New password must be at least 12 characters')
-    .regex(/[a-z]/, 'New password must contain a lowercase letter')
-    .regex(/[A-Z]/, 'New password must contain an uppercase letter')
-    .regex(/\d/, 'New password must contain a number')
-    .regex(/[^A-Za-z0-9]/, 'New password must contain a symbol'),
+    .min(6, 'New password must be at least 6 characters'),
 });
 
 export type ChangePasswordInput = z.infer<typeof ChangePasswordSchema>;

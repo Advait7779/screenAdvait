@@ -89,13 +89,7 @@ function fileSizeLabel(value: number | string | undefined) {
 }
 
 function isStrongPassword(value: string) {
-  return (
-    value.length >= 12 &&
-    /[a-z]/.test(value) &&
-    /[A-Z]/.test(value) &&
-    /\d/.test(value) &&
-    /[^A-Za-z0-9]/.test(value)
-  );
+  return value.length >= 6;
 }
 
 // ── SVG icons for sidebar nav ─────────────────────────────────────────────────
@@ -1317,7 +1311,7 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
               <input
                 autoFocus
                 type="password"
-                minLength={12}
+                minLength={6}
                 required
                 autoComplete="new-password"
                 value={replacementPassword}

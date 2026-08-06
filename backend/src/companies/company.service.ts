@@ -105,6 +105,10 @@ export class CompanyService {
       throw new NotFoundException('Company Administrator account not found for this company');
     }
 
+    if (customPassword && customPassword.trim().length < 6) {
+      throw new BadRequestException('Password must be at least 6 characters long');
+    }
+
     const passwordToSet = customPassword?.trim() || `${crypto.randomBytes(12).toString('base64url')}Aa1!`;
     const passwordHash = await bcrypt.hash(passwordToSet, 12);
 

@@ -443,12 +443,12 @@ export function App() {
                   <div>
                     <label className="block text-xs font-semibold text-gray-600 mb-1.5">Username</label>
                     <input required autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)}
-                      className="w-full bg-gray-50 border border-gray-200 rounded-md px-3.5 py-2.5 text-sm outline-none focus:border-green-600 focus:ring-2 focus:ring-green-100 transition-all" />
+                      className="w-full bg-gray-50 border border-gray-200 text-gray-900 rounded-md px-3.5 py-2.5 text-sm outline-none focus:border-green-600 focus:ring-2 focus:ring-green-100 transition-all" />
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-gray-600 mb-1.5">Password</label>
                     <input required autoComplete="current-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)}
-                      className="w-full bg-gray-50 border border-gray-200 rounded-md px-3.5 py-2.5 text-sm outline-none focus:border-green-600 focus:ring-2 focus:ring-green-100 transition-all" />
+                      className="w-full bg-gray-50 border border-gray-200 text-gray-900 rounded-md px-3.5 py-2.5 text-sm outline-none focus:border-green-600 focus:ring-2 focus:ring-green-100 transition-all" />
                   </div>
                   <button disabled={loading}
                     className="w-full py-3 rounded-md text-sm font-semibold text-white disabled:opacity-50 transition-all shadow-sm mt-3 hover:shadow-md active:scale-98"

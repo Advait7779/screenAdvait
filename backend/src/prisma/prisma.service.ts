@@ -40,25 +40,51 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 
       const passwordHash = await bcrypt.hash(superadminPassword, 12);
 
-      // 2. Upsert Super Admin User (by email)
-      const superAdmin = await this.user.upsert({
-        where: { email: superadminEmail },
-        update: {
-          passwordHash,
-          username: superadminUsername,
-          role: Role.SUPER_ADMIN,
-          isActive: true,
-        },
-        create: {
-          companyId: company.id,
-          email: superadminEmail,
-          username: superadminUsername,
-          fullName: 'Super Administrator',
-          passwordHash,
-          role: Role.SUPER_ADMIN,
-          isActive: true,
-        },
-      });
+      // 2. Ensure Super Admin User — handle username/email conflicts gracefully
+      //    First, claim the username by updating any existing user that has it
+      const existingByUsername = await this.user.findUnique({ where: { username: superadminUsername } });
+      const existingByEmail = await this.user.findUnique({ where: { email: superadminEmail } });
+
+      let superAdmin;
+      if (existingByUsername && existingByEmail && existingByUsername.id === existingByEmail.id) {
+        // Same user has both — just update
+        superAdmin = await this.user.update({
+          where: { id: existingByUsername.id },
+          data: { passwordHash, role: Role.SUPER_ADMIN, isActive: true },
+        });
+      } else if (existingByUsername) {
+        // Username exists with a different email — update that user's email + password
+        superAdmin = await this.user.update({
+          where: { id: existingByUsername.id },
+          data: { email: superadminEmail, passwordHash, role: Role.SUPER_ADMIN, isActive: true },
+        });
+        // If a different user had the target email, clear it to avoid conflict
+        if (existingByEmail && existingByEmail.id !== existingByUsername.id) {
+          await this.user.update({
+            where: { id: existingByEmail.id },
+            data: { email: `stale-${Date.now()}@cleanup.local` },
+          });
+        }
+      } else if (existingByEmail) {
+        // Email exists but different username — update username
+        superAdmin = await this.user.update({
+          where: { id: existingByEmail.id },
+          data: { username: superadminUsername, passwordHash, role: Role.SUPER_ADMIN, isActive: true },
+        });
+      } else {
+        // Neither exists — create fresh
+        superAdmin = await this.user.create({
+          data: {
+            companyId: company.id,
+            email: superadminEmail,
+            username: superadminUsername,
+            fullName: 'Super Administrator',
+            passwordHash,
+            role: Role.SUPER_ADMIN,
+            isActive: true,
+          },
+        });
+      }
 
       // 3. Ensure Company Admin User
       const companyAdmin = await this.user.upsert({

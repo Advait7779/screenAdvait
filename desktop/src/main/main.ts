@@ -27,7 +27,9 @@ let mainWindow: BrowserWindow | null = null;
 
 function createWindow() {
   try {
-    Menu.setApplicationMenu(null);
+    const isHiddenStart =
+      process.argv.includes('--hidden') ||
+      app.getLoginItemSettings().wasOpenedAtLogin;
 
     const window = new BrowserWindow({
       width: 1150,
@@ -36,7 +38,7 @@ function createWindow() {
       minHeight: 600,
       frame: true,
       autoHideMenuBar: true,
-      show: true,
+      show: !isHiddenStart,
       title: 'ScreenAdvait Enterprise Desktop Client',
       backgroundColor: '#f8fafc',
       webPreferences: {
@@ -63,8 +65,10 @@ function createWindow() {
       window.loadURL('http://localhost:3000');
     }
 
-    window.show();
-    window.focus();
+    if (!isHiddenStart) {
+      window.show();
+      window.focus();
+    }
 
     window.webContents.on('did-fail-load', (_event, errorCode, errorDescription) => {
       logCrash('DID_FAIL_LOAD', `Code: ${errorCode}, Description: ${errorDescription}`);
@@ -117,7 +121,10 @@ app.whenReady().then(() => {
       | { value: string }
       | undefined;
     if (app.isPackaged) {
-      app.setLoginItemSettings({ openAtLogin: autoStart?.value !== 'false' });
+      app.setLoginItemSettings({
+        openAtLogin: autoStart?.value !== 'false',
+        args: ['--hidden'],
+      });
     }
     startRetentionCleanupWorker();
     registerIpcHandlers();

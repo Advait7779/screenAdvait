@@ -47,6 +47,7 @@
     ],
     "asar": true,
     "win": {
+      "publisherName": "ScreenAdvait Enterprise",
       "target": [
         {
           "target": "nsis",

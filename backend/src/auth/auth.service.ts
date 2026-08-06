@@ -64,10 +64,14 @@ export class AuthService {
     const entitlement = await this.entitlements.getLicenseEntitlement(license.id);
     if (!entitlement.active) throw new ForbiddenException(entitlement.message);
 
+    const trimmedUsername = input.username.trim();
     const user = await this.prisma.user.findFirst({
       where: {
-        username: input.username,
         companyId: license.companyId,
+        OR: [
+          { username: { equals: trimmedUsername, mode: 'insensitive' } },
+          { email: { equals: trimmedUsername.toLowerCase(), mode: 'insensitive' } },
+        ],
       },
       include: { company: true },
     });

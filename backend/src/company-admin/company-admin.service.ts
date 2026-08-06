@@ -560,8 +560,13 @@ export class CompanyAdminService {
         rootFolderId = createdFolder.data.id;
       }
     } catch (err: any) {
+      const errorMsg =
+        err?.response?.data?.error_description ||
+        err?.response?.data?.error ||
+        err?.message ||
+        'Invalid Refresh Token or Client credentials';
       throw new ForbiddenException(
-        `Google Drive verification failed: ${err?.message || 'Invalid Refresh Token or Client credentials'}`,
+        `Google Drive verification failed: ${errorMsg}. Make sure Client ID, Client Secret, and Refresh Token belong to the same Google OAuth app.`,
       );
     }
 

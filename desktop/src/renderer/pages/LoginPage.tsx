@@ -169,78 +169,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, addToast }
             <p className="text-xs text-gray-500 mt-0.5">Enterprise Screenshot & License Platform</p>
           </div>
 
-          {/* Server Config Button */}
-          <div className="mb-4">
-            <button
-              type="button"
-              onClick={() => setShowServerConfig(!showServerConfig)}
-              className="w-full py-1.5 px-3 rounded-md bg-gray-50 hover:bg-gray-100 border border-gray-200 text-[11px] font-semibold text-gray-700 flex items-center justify-between transition-colors"
-            >
-              <span className="flex items-center gap-1.5">
-                <Server className="w-3.5 h-3.5 text-green-700" />
-                <span>Server: <strong className="font-mono text-gray-900">{currentApiUrl || 'https://api-screen.advaitdigital.co.in/api/v1'}</strong></span>
-              </span>
-              <Settings2 className="w-3.5 h-3.5 text-gray-400" />
-            </button>
 
-            {showServerConfig && (
-              <form onSubmit={handleSaveServerUrl} className="mt-2.5 p-3 rounded-md bg-gray-50 border border-gray-200 space-y-2.5 text-xs">
-                <div>
-                  <label className="block text-[11px] font-bold text-gray-700 mb-1">
-                    Server IP / URL Configuration
-                  </label>
-                  <p className="text-[10px] text-gray-500 mb-2">
-                    Enter the IP address of the laptop/server running the NestJS API (e.g., <code className="bg-gray-200 px-1 py-0.5 rounded font-mono">http://192.168.1.15:5000</code>).
-                  </p>
-                  <div className="relative">
-                    <Globe className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                    <input
-                      type="text"
-                      value={serverUrlInput}
-                      onChange={(e) => setServerUrlInput(e.target.value)}
-                      placeholder="http://192.168.1.15:5000"
-                      className="w-full bg-white border border-gray-300 rounded pl-8 pr-2 py-1.5 text-xs font-mono text-gray-800 outline-none focus:border-green-600 focus:ring-1 focus:ring-green-600"
-                    />
-                  </div>
-                </div>
-
-                {serverConfigMsg && (
-                  <div className={`p-2 rounded text-[11px] flex items-start gap-1.5 ${serverConfigMsg.isError ? 'bg-red-50 border border-red-200 text-red-800' : 'bg-green-50 border border-green-200 text-green-900'}`}>
-                    {serverConfigMsg.isError ? <AlertCircle className="w-3.5 h-3.5 text-red-500 shrink-0 mt-0.5" /> : <CheckCircle2 className="w-3.5 h-3.5 text-green-600 shrink-0 mt-0.5" />}
-                    <span>{serverConfigMsg.text}</span>
-                  </div>
-                )}
-
-                <div className="flex items-center gap-2 pt-1">
-                  <button
-                    type="submit"
-                    disabled={testingServer}
-                    className="flex-1 py-1.5 px-3 bg-green-700 hover:bg-green-800 text-white font-semibold rounded text-xs transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
-                  >
-                    {testingServer ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
-                    <span>Save &amp; Test Connection</span>
-                  </button>
-                  {serverUrlInput && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setServerUrlInput('');
-                        if (window.electronAPI?.saveServerUrl) {
-                          window.electronAPI.saveServerUrl('').then((res) => {
-                            setCurrentApiUrl(res.apiUrl);
-                            setServerConfigMsg({ text: 'Reset to default localhost URL', isError: false });
-                          });
-                        }
-                      }}
-                      className="py-1.5 px-2.5 border border-gray-300 bg-white hover:bg-gray-100 text-gray-700 font-semibold rounded text-xs transition-colors"
-                    >
-                      Reset
-                    </button>
-                  )}
-                </div>
-              </form>
-            )}
-          </div>
 
           {error && (
             <div className="mb-4 p-3 rounded-md bg-red-50 border border-red-200 flex items-start space-x-2.5 text-red-700 text-xs">
@@ -308,16 +237,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, addToast }
                     The saved key is verified securely at every login.
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEnterDifferentLicense(true);
-                    setError('');
-                  }}
-                  className="text-[11px] font-semibold text-green-800 hover:text-green-950 underline underline-offset-2 shrink-0"
-                >
-                  Change key
-                </button>
               </div>
             ) : (
               <div>

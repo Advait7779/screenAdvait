@@ -1,5 +1,5 @@
-import { Injectable, ConflictException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
+import { Prisma, Role } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CreateCompanyInput } from '@screenadvait/shared-utils';
 import * as bcrypt from 'bcryptjs';
@@ -89,5 +89,48 @@ export class CompanyService {
       ...c,
       maxStorageMb: Number(c.maxStorageMb),
     }));
+  }
+
+  async resetCompanyAdminPassword(
+    companyId: string,
+    superAdminUserId: string,
+    customPassword?: string,
+  ) {
+    const adminUser = await this.prisma.user.findFirst({
+      where: { companyId, role: Role.COMPANY_ADMIN },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    if (!adminUser) {
+      throw new NotFoundException('Company Administrator account not found for this company');
+    }
+
+    const passwordToSet = customPassword?.trim() || `${crypto.randomBytes(12).toString('base64url')}Aa1!`;
+    const passwordHash = await bcrypt.hash(passwordToSet, 12);
+
+    await this.prisma.user.update({
+      where: { id: adminUser.id },
+      data: {
+        passwordHash,
+        tokenVersion: { increment: 1 },
+      },
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        companyId,
+        userId: superAdminUserId,
+        action: 'COMPANY_ADMIN_PASSWORD_RESET',
+        entity: 'User',
+        entityId: adminUser.id,
+      },
+    });
+
+    return {
+      success: true,
+      username: adminUser.username,
+      email: adminUser.email,
+      temporaryPassword: passwordToSet,
+    };
   }
 }

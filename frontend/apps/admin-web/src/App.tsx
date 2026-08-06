@@ -192,6 +192,16 @@ export function App() {
     maxDevices: 25,
   });
 
+  // Reset Company Admin Password State
+  const [resetPasswordTargetCompany, setResetPasswordTargetCompany] = useState<any>(null);
+  const [customCompanyPassword, setCustomCompanyPassword] = useState('');
+  const [resetPasswordResult, setResetPasswordResult] = useState<{
+    companyName: string;
+    username: string;
+    temporaryPassword: string;
+  } | null>(null);
+  const [resetLoading, setResetLoading] = useState(false);
+
   // Subscriptions Table Pagination
   const [subPageSize, setSubPageSize] = useState<number>(10);
   const [subPage, setSubPage] = useState<number>(1);
@@ -355,6 +365,29 @@ export function App() {
       const message = apiErrorMessage(err, 'Renewal failed');
       setError(message);
       addToast(message, 'error');
+    }
+  };
+
+  const handleResetCompanyAdminPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetPasswordTargetCompany) return;
+    setResetLoading(true);
+    try {
+      const res = await axios.post(
+        `${API_URL}/companies/${resetPasswordTargetCompany.id}/reset-password`,
+        { password: customCompanyPassword || undefined },
+        auth(token),
+      );
+      setResetPasswordResult({
+        companyName: resetPasswordTargetCompany.name,
+        username: res.data.username,
+        temporaryPassword: res.data.temporaryPassword,
+      });
+      addToast(`Password reset successfully for ${resetPasswordTargetCompany.name}!`, 'success');
+    } catch (err: any) {
+      addToast(apiErrorMessage(err, 'Failed to reset admin password'), 'error');
+    } finally {
+      setResetLoading(false);
     }
   };
 
@@ -949,6 +982,17 @@ export function App() {
                                   </span>
                                 </td>
                                 <td className="px-3 py-3 space-x-2 whitespace-nowrap">
+                                  <button
+                                    onClick={() => {
+                                      setResetPasswordTargetCompany(item.company);
+                                      setResetPasswordResult(null);
+                                      setCustomCompanyPassword('');
+                                    }}
+                                    className="px-2.5 py-1 border border-blue-200 rounded-md text-blue-700 hover:bg-blue-50 text-[11px] font-medium transition-colors"
+                                  >
+                                    <KeyRound className="inline w-3 h-3 mr-1" />
+                                    Reset Pass
+                                  </button>
                                   <button onClick={() => renew(item.id)} className="px-2.5 py-1 border border-gray-200 rounded-md hover:bg-gray-100 text-gray-600 transition-colors text-[11px] font-medium">Renew 30d</button>
                                   {item.status === 'ACTIVE'
                                     ? <button onClick={() => changeStatus(item.id, 'SUSPENDED')} className="px-2.5 py-1 border border-amber-200 rounded-md text-amber-700 hover:bg-amber-50 text-[11px] font-medium transition-colors"><PauseCircle className="inline w-3 h-3 mr-1" />Suspend</button>
@@ -1129,6 +1173,119 @@ export function App() {
           </div>
         </main>
       </div>
+
+      {resetPasswordTargetCompany && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/55 p-4"
+          role="dialog"
+          aria-modal="true"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) {
+              setResetPasswordTargetCompany(null);
+              setResetPasswordResult(null);
+              setCustomCompanyPassword('');
+            }
+          }}
+        >
+          <div className="w-full max-w-md rounded-lg border border-gray-200 bg-white p-6 shadow-2xl">
+            <div className="flex items-center gap-3 text-green-700 mb-4 pb-3 border-b border-gray-100">
+              <div className="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center shrink-0 border border-green-100">
+                <KeyRound className="h-5 w-5 text-green-700" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-gray-900">Reset Company Admin Password</h2>
+                <p className="text-xs text-gray-500">Company: {resetPasswordTargetCompany.name}</p>
+              </div>
+            </div>
+
+            {resetPasswordResult ? (
+              <div className="space-y-4">
+                <div className="bg-green-50 border border-green-200 rounded-md p-4 text-xs text-green-950">
+                  <div className="font-bold text-green-900 mb-1">Company Admin Password Updated!</div>
+                  <p className="text-[11px] text-green-700 mb-3">
+                    Send these updated credentials to the Company Admin for <strong>{resetPasswordResult.companyName}</strong>.
+                  </p>
+                  <div className="space-y-2">
+                    {[
+                      ['Admin Username', resetPasswordResult.username],
+                      ['New Password', resetPasswordResult.temporaryPassword],
+                    ].map(([label, value]) => (
+                      <button
+                        key={label}
+                        type="button"
+                        onClick={() => {
+                          void navigator.clipboard?.writeText(value);
+                          addToast(`${label} copied!`, 'success');
+                        }}
+                        className="w-full flex items-center justify-between gap-3 rounded-md border border-green-200 bg-white px-3 py-2 text-left hover:border-green-400 shadow-sm"
+                      >
+                        <div>
+                          <span className="block text-[10px] font-semibold uppercase text-green-700">{label}</span>
+                          <span className="block font-mono text-xs font-bold text-gray-900 truncate">{value}</span>
+                        </div>
+                        <Copy className="h-4 w-4 text-green-700 shrink-0" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex justify-end">
+                  <button
+                    onClick={() => {
+                      setResetPasswordTargetCompany(null);
+                      setResetPasswordResult(null);
+                      setCustomCompanyPassword('');
+                    }}
+                    className="px-4 py-2 bg-green-700 text-white rounded-md text-xs font-semibold hover:bg-green-800 transition-colors shadow-sm"
+                  >
+                    Done
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={handleResetCompanyAdminPassword} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
+                    New Custom Password (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={customCompanyPassword}
+                    onChange={(e) => setCustomCompanyPassword(e.target.value)}
+                    placeholder="Leave empty to auto-generate password"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-md px-3 py-2.5 text-xs text-gray-900 font-mono focus:outline-none focus:border-green-600 focus:ring-1 focus:ring-green-600"
+                  />
+                  <p className="text-[11px] text-gray-400 mt-1">
+                    If left blank, a secure random temporary password will be created automatically.
+                  </p>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setResetPasswordTargetCompany(null)}
+                    className="px-4 py-2 rounded-md border border-gray-200 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={resetLoading}
+                    className="px-4 py-2 bg-green-700 text-white rounded-md text-xs font-semibold hover:bg-green-800 transition-colors shadow-sm flex items-center gap-1.5 disabled:opacity-50"
+                  >
+                    {resetLoading ? (
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <KeyRound className="w-3.5 h-3.5" />
+                    )}
+                    <span>Set & Reveal Password</span>
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
 
       <ConfirmDialog open={logoutConfirmationOpen} onCancel={() => setLogoutConfirmationOpen(false)} onConfirm={performLogout} />
       <ToastContainer toasts={toasts} onDismiss={removeToast} />

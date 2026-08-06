@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, UseGuards, Req } from '@nestjs/common';
 import { CompanyService } from './company.service.js';
 import { AuthGuard } from '@nestjs/passport';
 import { CreateCompanyInput, CreateCompanySchema } from '@screenadvait/shared-utils';
@@ -24,5 +24,18 @@ export class CompanyController {
     @Req() req: any,
   ) {
     return this.companyService.createCompany(body, req.user.id);
+  }
+
+  @Post(':companyId/reset-password')
+  async resetCompanyAdminPassword(
+    @Param('companyId') companyId: string,
+    @Body() body: { password?: string },
+    @Req() req: any,
+  ) {
+    return this.companyService.resetCompanyAdminPassword(
+      companyId,
+      req.user.id,
+      body?.password,
+    );
   }
 }

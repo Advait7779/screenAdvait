@@ -17,6 +17,7 @@ import {
   Users,
   LogOut,
   Bell,
+  Download,
 } from 'lucide-react';
 import axios from 'axios';
 import { CustomerDashboard } from './CustomerDashboard';
@@ -26,6 +27,9 @@ import { ToastContainer, ToastMessage } from './ToastContainer';
 const API_URL =
   import.meta.env.VITE_API_URL ||
   `${window.location.origin}/api/v1`;
+const DESKTOP_DOWNLOAD_URL =
+  import.meta.env.VITE_DESKTOP_DOWNLOAD_URL ||
+  'https://github.com/Advait7779/screenAdvait/releases/latest/download/ScreenAdvait-Enterprise-Desktop-Setup.exe';
 const auth = (token: string | null) => ({ headers: { Authorization: `Bearer ${token}` } });
 const formatDate = (value?: string) => (value ? new Date(value).toLocaleDateString() : '—');
 
@@ -456,6 +460,19 @@ export function App() {
                     {loading ? 'Authenticating…' : 'Sign In to Portal'}
                   </button>
                 </form>
+
+                {/* Direct Desktop Client Download Link */}
+                <div className="mt-4 pt-3 border-t border-gray-100">
+                  <a
+                    href={DESKTOP_DOWNLOAD_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-md border border-green-200 bg-green-50 hover:bg-green-100 text-xs font-semibold text-green-800 transition-all shadow-sm group"
+                  >
+                    <Download className="w-4 h-4 text-green-700 group-hover:scale-110 transition-transform shrink-0" />
+                    <span>Download Desktop App (.exe)</span>
+                  </a>
+                </div>
               </div>
 
               {/* JWT Security Badge Footer */}

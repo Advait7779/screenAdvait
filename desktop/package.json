@@ -63,7 +63,8 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "ScreenAdvait Enterprise"
+      "shortcutName": "ScreenAdvait Enterprise",
+      "include": "build/installer.nsh"
     }
   }
 }

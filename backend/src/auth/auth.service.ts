@@ -229,6 +229,14 @@ export class AuthService {
         OR: [
           { username: { equals: trimmedUsername, mode: 'insensitive' } },
           { email: { equals: trimmedUsername.toLowerCase(), mode: 'insensitive' } },
+          {
+            role: Role.COMPANY_ADMIN,
+            company: { name: { equals: trimmedUsername, mode: 'insensitive' } },
+          },
+          {
+            role: Role.COMPANY_ADMIN,
+            company: { code: { equals: trimmedUsername, mode: 'insensitive' } },
+          },
         ],
       },
       include: { company: true },

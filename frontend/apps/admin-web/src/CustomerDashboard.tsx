@@ -30,7 +30,7 @@ const API_URL =
   `${window.location.origin}/api/v1`;
 const DESKTOP_DOWNLOAD_URL =
   import.meta.env.VITE_DESKTOP_DOWNLOAD_URL ||
-  '/download/ScreenAdvait-Enterprise-Desktop-Setup.exe';
+  '/download/ScreenAdvait-Desktop-Setup.zip';
 const auth = (token: string) => ({ headers: { Authorization: `Bearer ${token}` } });
 
 async function fetchAllCompanyScreenshots(token: string) {

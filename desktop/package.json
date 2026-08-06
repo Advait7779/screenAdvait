@@ -1,5 +1,5 @@
 {
-  "name": "@screenadvait/desktop",
+  "name": "screenadvait-desktop",
   "version": "1.1.0",
   "description": "ScreenAdvait enterprise desktop capture client",
   "author": "ScreenAdvait",
@@ -9,14 +9,10 @@
     "dev": "vite --host 127.0.0.1",
     "build": "tsc -b && vite build",
     "typecheck": "tsc --noEmit --incremental false -p tsconfig.json && tsc --noEmit --incremental false -p tsconfig.renderer.json",
-    "build:electron": "tsc -b && vite build && electron-builder --win",
-    "postinstall": "electron-builder install-app-deps"
+    "build:electron": "tsc -b && vite build && electron-builder --win -c.win.signAndEditExecutable=false"
   },
   "dependencies": {
-    "@screenadvait/shared-types": "workspace:*",
-    "@screenadvait/shared-utils": "workspace:*",
     "axios": "^1.7.4",
-    "better-sqlite3": "^12.10.0",
     "clsx": "^2.1.1",
     "form-data": "^4.0.0",
     "lucide-react": "^0.439.0",
@@ -25,13 +21,12 @@
     "tailwind-merge": "^2.5.2"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.11",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.1",
     "autoprefixer": "^10.4.20",
-    "electron": "^43.0.0",
-    "electron-builder": "^26.9.1",
+    "electron": "^32.0.0",
+    "electron-builder": "^24.13.3",
     "postcss": "^8.4.45",
     "tailwindcss": "^3.4.10",
     "typescript": "^5.7.0",
@@ -40,19 +35,28 @@
   "build": {
     "appId": "com.screenadvait.desktop",
     "productName": "ScreenAdvait Enterprise Desktop",
-    "directories": { "output": "release" },
-    "files": ["dist/**/*", "public/**/*", "package.json"],
-    "asar": { "smartUnpack": false },
-    "asarUnpack": [
-      "node_modules/better-sqlite3/build/Release/better_sqlite3.node"
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "public/**/*",
+      "package.json"
     ],
+    "asar": true,
     "win": {
-      "target": "nsis",
-      "icon": "public/logo.png"
+      "target": [
+        "nsis"
+      ],
+      "icon": "public/logo.png",
+      "verifyUpdateCodeSignature": false
     },
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "ScreenAdvait Enterprise"
     }
   }
 }

@@ -1,7 +1,7 @@
 import { app, ipcMain, IpcMainInvokeEvent, nativeImage } from 'electron';
 import fs from 'fs';
 import axios from 'axios';
-import { IPC_CHANNELS } from '@screenadvait/shared-types';
+import { IPC_CHANNELS } from './ipc-channels.js';
 import { getDb } from './sqlite.store.js';
 import {
   captureDesktopNow,

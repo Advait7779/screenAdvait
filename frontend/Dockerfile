@@ -6,7 +6,7 @@ WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@11.9.0 --activate
 
 # Copy workspace config first for layer caching
-COPY package.json pnpm-workspace.yaml .npmrc tsconfig.base.json ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc tsconfig.base.json ./
 COPY packages/shared-types/package.json packages/shared-types/tsconfig.json ./packages/shared-types/
 COPY packages/shared-utils/package.json packages/shared-utils/tsconfig.json ./packages/shared-utils/
 COPY apps/admin-web/package.json apps/admin-web/tsconfig.json ./apps/admin-web/

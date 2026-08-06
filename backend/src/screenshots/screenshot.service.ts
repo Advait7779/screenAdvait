@@ -291,8 +291,12 @@ export class ScreenshotService implements OnModuleInit {
       return {
         enabled: true,
         provider: 'google-drive',
-        clientId: parsed.clientId || process.env.GOOGLE_DRIVE_CLIENT_ID,
-        clientSecret: parsed.clientSecret || process.env.GOOGLE_DRIVE_CLIENT_SECRET,
+        clientId:
+          parsed.clientId ||
+          process.env.GOOGLE_DRIVE_CLIENT_ID ||
+          '407408718192.apps.googleusercontent.com',
+        clientSecret:
+          parsed.clientSecret || process.env.GOOGLE_DRIVE_CLIENT_SECRET || '',
         refreshToken: parsed.refreshToken,
         rootFolderId: conn.rootFolderId,
         rootFolderName: conn.rootFolderName,

@@ -513,14 +513,18 @@ export class CompanyAdminService {
     adminUserId: string,
     input: { clientId?: string; clientSecret?: string; refreshToken: string; rootFolderName?: string },
   ) {
-    const clientId = input.clientId?.trim() || process.env.GOOGLE_DRIVE_CLIENT_ID;
-    const clientSecret = input.clientSecret?.trim() || process.env.GOOGLE_DRIVE_CLIENT_SECRET;
+    const clientId =
+      input.clientId?.trim() ||
+      process.env.GOOGLE_DRIVE_CLIENT_ID ||
+      '407408718192.apps.googleusercontent.com';
+    const clientSecret =
+      input.clientSecret?.trim() ||
+      process.env.GOOGLE_DRIVE_CLIENT_SECRET ||
+      '';
     const refreshToken = input.refreshToken.trim();
 
-    if (!clientId || !clientSecret) {
-      throw new ForbiddenException(
-        'Google Client ID and Client Secret are required. Provide them or configure server credentials.',
-      );
+    if (!refreshToken) {
+      throw new ForbiddenException('Google Drive Refresh Token is required.');
     }
 
     const oauth2Client = new google.auth.OAuth2(clientId, clientSecret);

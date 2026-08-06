@@ -10,5 +10,15 @@
     "dev:company": "cd frontend && pnpm dev:company",
     "build:frontend": "cd frontend && pnpm build",
     "build:backend": "cd backend && pnpm build"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/client",
+      "@prisma/engines",
+      "better-sqlite3",
+      "electron",
+      "esbuild",
+      "prisma"
+    ]
   }
 }

@@ -9,122 +9,100 @@ import { startScreenshotEngine } from './screenshot.engine.js';
 import { initializeSession } from './session.store.js';
 import { startRetentionCleanupWorker } from './retention.js';
 
+function logCrash(type: string, error: any) {
+  try {
+    const userData = app.getPath('userData');
+    if (!fs.existsSync(userData)) fs.mkdirSync(userData, { recursive: true });
+    const logPath = path.join(userData, 'crash_log.txt');
+    const msg = `[${new Date().toISOString()}] ${type}: ${error?.stack || error?.message || error}\n`;
+    fs.appendFileSync(logPath, msg);
+    console.error(msg);
+  } catch {}
+}
+
+process.on('uncaughtException', (error) => logCrash('UNCAUGHT_EXCEPTION', error));
+process.on('unhandledRejection', (reason) => logCrash('UNHANDLED_REJECTION', reason));
+
 let mainWindow: BrowserWindow | null = null;
 
 function createWindow() {
-  Menu.setApplicationMenu(null);
+  try {
+    Menu.setApplicationMenu(null);
 
-  const window = new BrowserWindow({
-    width: 1150,
-    height: 750,
-    minWidth: 900,
-    minHeight: 600,
-    frame: true,
-    autoHideMenuBar: true,
-    show: false,
-    title: 'ScreenAdvait Enterprise Desktop Client',
-    icon: path.join(__dirname, '../../public/logo.png'),
-    backgroundColor: '#f8fafc',
-    webPreferences: {
-      preload: path.join(__dirname, '../preload/preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true,
-      webSecurity: true,
-    },
-  });
-  mainWindow = window;
+    const window = new BrowserWindow({
+      width: 1150,
+      height: 750,
+      minWidth: 900,
+      minHeight: 600,
+      frame: true,
+      autoHideMenuBar: true,
+      show: true,
+      title: 'ScreenAdvait Enterprise Desktop Client',
+      backgroundColor: '#f8fafc',
+      webPreferences: {
+        preload: path.join(__dirname, '../preload/preload.js'),
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: false,
+        webSecurity: false,
+      },
+    });
+    mainWindow = window;
 
-  window.setMenu(null);
+    window.setMenu(null);
 
-  const rendererHtml = path.join(__dirname, '../renderer/index.html');
-  const fileUrl = pathToFileURL(rendererHtml).toString();
+    const rendererHtml = path.join(__dirname, '../renderer/index.html');
+    const fileUrl = pathToFileURL(rendererHtml).toString();
 
-  const devServerUrl = process.env.SCREENADVAIT_RENDERER_URL;
-  if (devServerUrl && !app.isPackaged) {
-    window.loadURL(devServerUrl);
-  } else if (fs.existsSync(rendererHtml)) {
-    console.log(`[Main] Loading renderer from file URL: ${fileUrl}`);
-    window.loadURL(fileUrl);
-  } else {
-    console.log('[Main] Loading renderer from dev server: http://localhost:3000');
-    window.loadURL('http://localhost:3000');
-  }
+    console.log(`[Main] Loading renderer HTML: ${rendererHtml} (exists: ${fs.existsSync(rendererHtml)})`);
 
-  let hasShown = false;
-  const showWindow = () => {
-    if (hasShown || window.isDestroyed()) return;
-    hasShown = true;
+    if (fs.existsSync(rendererHtml)) {
+      window.loadURL(fileUrl);
+    } else {
+      console.log('[Main] Loading renderer fallback: http://localhost:3000');
+      window.loadURL('http://localhost:3000');
+    }
+
     window.show();
     window.focus();
-    window.setAlwaysOnTop(true);
-    setTimeout(() => {
-      if (!window.isDestroyed()) window.setAlwaysOnTop(false);
-    }, 800);
-  };
 
-  window.once('ready-to-show', showWindow);
-  window.webContents.once('did-finish-load', showWindow);
-  window.webContents.on('did-fail-load', (_event, errorCode, errorDescription) => {
-    console.error(`[Main] Renderer failed to load (${errorCode}): ${errorDescription}`);
-    showWindow();
-  });
-  setTimeout(showWindow, 3000);
+    window.webContents.on('did-fail-load', (_event, errorCode, errorDescription) => {
+      logCrash('DID_FAIL_LOAD', `Code: ${errorCode}, Description: ${errorDescription}`);
+      window.show();
+    });
 
-  let recoveryAttempts = 0;
-  let recoveryResetTimer: NodeJS.Timeout | null = null;
-  const recoverRenderer = (reason: string) => {
-    if (window.isDestroyed() || recoveryAttempts >= 1) return;
-    recoveryAttempts += 1;
-    console.error(`[Main] Recovering renderer after ${reason}`);
-    setTimeout(() => {
-      if (!window.isDestroyed()) window.webContents.reloadIgnoringCache();
-    }, 250);
-  };
+    window.webContents.on('render-process-gone', (_event, details) => {
+      logCrash('RENDER_PROCESS_GONE', `Reason: ${details.reason}, exitCode: ${details.exitCode}`);
+    });
 
-  window.webContents.on('unresponsive', () => recoverRenderer('it became unresponsive'));
-  window.webContents.on('render-process-gone', (_event, details) => {
-    if (details.reason !== 'clean-exit') {
-      recoverRenderer(`the process exited (${details.reason})`);
-    }
-  });
-  window.webContents.on('did-finish-load', () => {
-    if (recoveryResetTimer) clearTimeout(recoveryResetTimer);
-    recoveryResetTimer = setTimeout(() => {
-      recoveryAttempts = 0;
-      recoveryResetTimer = null;
-    }, 30_000);
-  });
-  window.on('closed', () => {
-    if (recoveryResetTimer) clearTimeout(recoveryResetTimer);
-  });
+    window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+    window.webContents.on('will-navigate', (event, url) => {
+      const current = window.webContents.getURL().split('#')[0];
+      if (current && url.split('#')[0] !== current) event.preventDefault();
+    });
 
-  window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
-  window.webContents.on('will-navigate', (event, url) => {
-    const current = window.webContents.getURL().split('#')[0];
-    if (current && url.split('#')[0] !== current) event.preventDefault();
-  });
-
-  window.webContents.on('before-input-event', (event, input) => {
-    if ((input.control || input.meta) && input.key.toLowerCase() === 'r') {
-      event.preventDefault();
-      window.reload();
-    }
-  });
-
-  // Minimize to tray on close
-  window.on('close', (event) => {
-    if (!(app as any).isQuitting) {
-      event.preventDefault();
-      window.hide();
-    }
-  });
+    window.on('close', (event) => {
+      if (!(app as any).isQuitting) {
+        event.preventDefault();
+        window.hide();
+      }
+    });
+  } catch (err) {
+    logCrash('CREATE_WINDOW_ERROR', err);
+  }
 }
 
-const gotTheLock = app.requestSingleInstanceLock();
-if (!gotTheLock) {
-  app.quit();
-} else {
+app.whenReady().then(() => {
+  const gotTheLock = app.requestSingleInstanceLock();
+  if (!gotTheLock) {
+    console.warn('[Main] Another instance is already running.');
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  }
+
   app.on('second-instance', () => {
     if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore();
@@ -133,7 +111,7 @@ if (!gotTheLock) {
     }
   });
 
-  app.whenReady().then(() => {
+  try {
     const db = initSqliteDb();
     const autoStart = db.prepare('SELECT value FROM local_settings WHERE key = ?').get('autoStart') as
       | { value: string }
@@ -143,25 +121,36 @@ if (!gotTheLock) {
     }
     startRetentionCleanupWorker();
     registerIpcHandlers();
+  } catch (err) {
+    logCrash('INIT_ERROR', err);
+  }
 
-    createWindow();
-    if (mainWindow) {
+  createWindow();
+  if (mainWindow) {
+    try {
       createSystemTray(mainWindow);
+    } catch (err) {
+      logCrash('SYSTEM_TRAY_ERROR', err);
     }
+  }
 
+  try {
     const session = initializeSession();
+    const db = initSqliteDb();
     const pauseSetting = db.prepare('SELECT value FROM local_settings WHERE key = ?').get('capturePaused') as { value: string } | undefined;
     if (session && pauseSetting?.value !== 'true') {
       startScreenshotEngine();
     }
+  } catch (err) {
+    logCrash('ENGINE_INIT_ERROR', err);
+  }
 
-    app.on('activate', () => {
-      if (BrowserWindow.getAllWindows().length === 0) {
-        createWindow();
-      }
-    });
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow();
+    }
   });
-}
+});
 
 app.on('before-quit', () => {
   (app as any).isQuitting = true;

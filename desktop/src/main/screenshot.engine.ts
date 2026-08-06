@@ -2,7 +2,6 @@ import path from 'path';
 import fs from 'fs';
 import { app, desktopCapturer, Notification, screen } from 'electron';
 import axios from 'axios';
-import FormData from 'form-data';
 import crypto from 'crypto';
 import { getDb } from './sqlite.store.js';
 import {
@@ -309,12 +308,10 @@ export async function processPendingUploads() {
 }
 
 async function upload(item: any, token: string) {
+  const fileBuffer = fs.readFileSync(item.file_path);
+  const blob = new Blob([fileBuffer], { type: item.mime_type || 'image/png' });
   const form = new FormData();
-  form.append('file', fs.createReadStream(item.file_path), {
-    filename: item.file_name,
-    contentType: item.mime_type,
-    knownLength: item.file_size,
-  });
+  form.append('file', blob, item.file_name);
   form.append('deviceId', getDeviceDetails().deviceId);
   form.append('capturedAt', item.captured_at);
   form.append('idempotencyKey', item.id);
@@ -323,7 +320,7 @@ async function upload(item: any, token: string) {
     String(-new Date(item.captured_at).getTimezoneOffset()),
   );
   return axios.post(`${getApiUrl()}/screenshots/upload`, form, {
-    headers: { ...form.getHeaders(), Authorization: `Bearer ${token}` },
+    headers: { Authorization: `Bearer ${token}` },
     timeout: 30_000,
     maxContentLength: 16 * 1024 * 1024,
     maxBodyLength: 16 * 1024 * 1024,

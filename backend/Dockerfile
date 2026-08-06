@@ -23,8 +23,10 @@ COPY tsconfig.json ./
 RUN pnpm --filter @screenadvait/shared-types build \
   && pnpm --filter @screenadvait/shared-utils build \
   && npx prisma generate --schema prisma/schema.prisma \
-  && npx nest build \
-  && pnpm deploy --prod --legacy /opt/screenadvait-api
+  && npx nest build
+
+# Prune dev dependencies for smaller production image
+RUN pnpm prune --prod
 
 # --- Production image ---
 FROM node:24-bookworm-slim AS runner
@@ -37,9 +39,12 @@ RUN apt-get update -y && apt-get install -y openssl ca-certificates && rm -rf /v
 RUN groupadd --system --gid 10001 screenadvait \
   && useradd --system --uid 10001 --gid screenadvait --create-home screenadvait
 
-COPY --from=builder --chown=screenadvait:screenadvait /opt/screenadvait-api ./
+# Copy production node_modules, built output, and prisma
+COPY --from=builder --chown=screenadvait:screenadvait /app/node_modules ./node_modules
+COPY --from=builder --chown=screenadvait:screenadvait /app/packages ./packages
 COPY --from=builder --chown=screenadvait:screenadvait /app/dist ./dist
 COPY --from=builder --chown=screenadvait:screenadvait /app/prisma ./prisma
+COPY --from=builder --chown=screenadvait:screenadvait /app/package.json ./
 
 RUN mkdir -p /data/screenshots && chown -R screenadvait:screenadvait /data/screenshots
 

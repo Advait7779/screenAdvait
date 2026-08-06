@@ -13,7 +13,7 @@ const API_URL =
   `${window.location.origin}/api/v1`;
 const DESKTOP_DOWNLOAD_URL =
   import.meta.env.VITE_DESKTOP_DOWNLOAD_URL ||
-  'https://github.com/Advait7779/screenAdvait/releases/latest/download/ScreenAdvait-Enterprise-Desktop-Setup.exe';
+  '/download/ScreenAdvait-Enterprise-Desktop-Setup.exe';
 
 function apiErrorMessage(error: any, fallback: string) {
   const details = error.response?.data?.errors;

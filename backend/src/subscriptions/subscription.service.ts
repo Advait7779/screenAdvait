@@ -194,13 +194,18 @@ export class SubscriptionService {
     });
     return Promise.all(
       subscriptions.map(async (subscription) => {
-        const [employeeCount, storage] = await Promise.all([
+        const [employeeCount, storage, adminUser] = await Promise.all([
           this.prisma.user.count({
             where: { companyId: subscription.companyId, role: Role.EMPLOYEE },
           }),
           this.prisma.screenshot.aggregate({
             where: { companyId: subscription.companyId },
             _sum: { fileSize: true },
+          }),
+          this.prisma.user.findFirst({
+            where: { companyId: subscription.companyId, role: Role.COMPANY_ADMIN },
+            select: { username: true, email: true },
+            orderBy: { createdAt: 'asc' },
           }),
         ]);
         return {
@@ -209,6 +214,8 @@ export class SubscriptionService {
             id: subscription.company.id,
             name: subscription.company.name,
             code: subscription.company.code,
+            adminUsername: adminUser?.username || subscription.company.code.toLowerCase(),
+            contactEmail: adminUser?.email || subscription.company.contactEmail,
           },
           usage: {
             employees: employeeCount,

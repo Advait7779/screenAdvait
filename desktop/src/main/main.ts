@@ -31,6 +31,7 @@ const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
   console.warn('[Main] Another instance is already running. Quitting duplicate instance.');
   app.quit();
+  process.exit(0);
 } else {
   app.on('second-instance', () => {
     if (mainWindow && !mainWindow.isDestroyed()) {

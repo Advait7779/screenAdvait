@@ -1,0 +1,22 @@
+{
+  "name": "screenadvait-frontend",
+  "version": "1.1.0",
+  "private": true,
+  "packageManager": "pnpm@11.9.0",
+  "description": "ScreenAdvait Frontend - SuperAdmin & Company Portals",
+  "scripts": {
+    "build": "pnpm --recursive run build",
+    "dev": "pnpm --recursive --parallel run dev",
+    "dev:admin": "pnpm --filter @screenadvait/admin-web dev",
+    "dev:company": "pnpm --filter @screenadvait/customer-web dev",
+    "lint": "pnpm --recursive --if-present run lint",
+    "typecheck": "pnpm --recursive run typecheck"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=22.0.0 <25",
+    "pnpm": "11.9.0"
+  }
+}

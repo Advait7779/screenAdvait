@@ -220,14 +220,15 @@ export class AuthService {
     ipAddress = '127.0.0.1',
     userAgent = 'Web Portal',
   ) {
-    const attemptKey = `portal:${ipAddress}:${input.username.toLowerCase()}`;
+    const trimmedUsername = input.username.trim();
+    const attemptKey = `portal:${ipAddress}:${trimmedUsername.toLowerCase()}`;
     this.consumeAttempt(attemptKey);
 
     const user = await this.prisma.user.findFirst({
       where: {
         OR: [
-          { username: input.username },
-          { email: input.username.toLowerCase() },
+          { username: { equals: trimmedUsername, mode: 'insensitive' } },
+          { email: { equals: trimmedUsername.toLowerCase(), mode: 'insensitive' } },
         ],
       },
       include: { company: true },

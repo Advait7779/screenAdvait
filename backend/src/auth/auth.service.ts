@@ -219,8 +219,13 @@ export class AuthService {
     const attemptKey = `portal:${ipAddress}:${input.username.toLowerCase()}`;
     this.consumeAttempt(attemptKey);
 
-    const user = await this.prisma.user.findUnique({
-      where: { username: input.username },
+    const user = await this.prisma.user.findFirst({
+      where: {
+        OR: [
+          { username: input.username },
+          { email: input.username.toLowerCase() },
+        ],
+      },
       include: { company: true },
     });
     const passwordValid = user

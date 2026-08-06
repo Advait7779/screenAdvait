@@ -53,7 +53,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       // 2. Create Super Admin User
       const superAdmin = await this.user.upsert({
         where: { email: superadminEmail },
-        update: { passwordHash },
+        update: { passwordHash, username: superadminUsername, isActive: true },
         create: {
           companyId: company.id,
           email: superadminEmail,

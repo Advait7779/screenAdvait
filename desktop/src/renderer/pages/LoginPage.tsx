@@ -178,7 +178,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, addToast }
             >
               <span className="flex items-center gap-1.5">
                 <Server className="w-3.5 h-3.5 text-green-700" />
-                <span>Server: <strong className="font-mono text-gray-900">{currentApiUrl || 'http://localhost:5000/api/v1'}</strong></span>
+                <span>Server: <strong className="font-mono text-gray-900">{currentApiUrl || 'https://api-screen.advaitdigital.co.in/api/v1'}</strong></span>
               </span>
               <Settings2 className="w-3.5 h-3.5 text-gray-400" />
             </button>

@@ -39,7 +39,7 @@ export function getApiUrl(): string {
   } catch (e) {
     // Fallback if db is uninitialized
   }
-  return process.env.SCREENADVAIT_API_URL || 'http://localhost:5000/api/v1';
+  return process.env.SCREENADVAIT_API_URL || 'https://api-screen.advaitdigital.co.in/api/v1';
 }
 
 function isAllowedServerUrl(value: string) {

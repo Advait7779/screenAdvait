@@ -599,7 +599,9 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
             <div className="flex items-center gap-1.5 text-sm min-w-0">
               <span className="text-gray-400 hidden sm:inline truncate max-w-[120px]">{session?.company?.name}</span>
               <ChevronRight className="w-3.5 h-3.5 text-gray-300 hidden sm:inline shrink-0" />
-              <span className="font-semibold text-gray-800 truncate">{view === 'captures' ? 'Employee Captures' : 'Employees & Keys'}</span>
+              <span className="font-semibold text-gray-800 truncate">
+                {view === 'captures' ? 'Employee Captures' : view === 'all-screenshots' ? 'All Screenshots' : view === 'drive-settings' ? 'Google Drive Storage' : 'Employees & Keys'}
+              </span>
             </div>
           </div>
 
@@ -704,10 +706,10 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
             {/* Page title */}
             <div className="mb-6">
               <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
-                {view === 'captures' ? 'Employee Screenshot Management' : view === 'all-screenshots' ? 'All Employee Screenshots' : 'Employees & License Keys'}
+                {view === 'captures' ? 'Employee Screenshot Management' : view === 'all-screenshots' ? 'All Employee Screenshots' : view === 'drive-settings' ? 'Google Drive Storage Settings' : 'Employees & License Keys'}
               </h1>
               <p className="text-sm text-gray-500 mt-0.5">
-                {view === 'captures' ? 'Review latest team desktop activity captures.' : view === 'all-screenshots' ? 'Full organization screenshot archive with search & custom pagination.' : 'Create employees and issue one-time activation keys for the desktop app.'}
+                {view === 'captures' ? 'Review latest team desktop activity captures.' : view === 'all-screenshots' ? 'Full organization screenshot archive with search & custom pagination.' : view === 'drive-settings' ? 'Configure your company Google Drive account to store employee screenshots directly in your cloud.' : 'Create employees and issue one-time activation keys for the desktop app.'}
               </p>
             </div>
 

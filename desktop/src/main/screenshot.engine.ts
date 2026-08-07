@@ -30,7 +30,7 @@ let entitlementPaused = false;
 
 const ALLOWED_INTERVALS = new Set([60, 300, 600, 900, 1800, 3600]);
 
-async function capturePrimaryDisplayPng() {
+async function captureScreenshot() {
   const primaryDisplay = screen.getPrimaryDisplay();
   const width = Math.max(
     1,
@@ -51,7 +51,7 @@ async function capturePrimaryDisplayPng() {
   if (!source || source.thumbnail.isEmpty()) {
     throw new Error('Windows did not return a desktop capture source');
   }
-  return source.thumbnail.toPNG();
+  return source.thumbnail.toJPEG(92);
 }
 
 function safeEmployeeFolder(value: unknown) {
@@ -191,10 +191,10 @@ export async function captureDesktopNow(): Promise<{
     );
     fs.mkdirSync(storageDir, { recursive: true });
 
-    const fileName = `${now.toISOString().replace(/[-:T.Z]/g, '')}-${crypto.randomBytes(3).toString('hex')}.png`;
+    const fileName = `${now.toISOString().replace(/[-:T.Z]/g, '')}-${crypto.randomBytes(3).toString('hex')}.jpg`;
     const filePath = path.join(storageDir, fileName);
-    const png = await capturePrimaryDisplayPng();
-    await fs.promises.writeFile(filePath, png, { flag: 'wx' });
+    const imageBuffer = await captureScreenshot();
+    await fs.promises.writeFile(filePath, imageBuffer, { flag: 'wx' });
     const stats = fs.statSync(filePath);
     const queueId = `queue_${crypto.randomUUID()}`;
     getDb()
@@ -207,7 +207,7 @@ export async function captureDesktopNow(): Promise<{
         filePath,
         fileName,
         stats.size,
-        'image/png',
+        'image/jpeg',
         now.toISOString(),
         year,
         month,

@@ -140,16 +140,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ session, addToast,
             <Shield className="w-3.5 h-3.5 text-gray-500" />
             <span className="text-xs font-medium">Managed by Admin</span>
           </div>
-
-          <button
-            onClick={handleCaptureNow}
-            disabled={capturing || Boolean(engineStatus.entitlementError)}
-            style={{ background: 'linear-gradient(135deg, #15803d, #166534)' }}
-            className="hover:opacity-90 active:scale-98 text-white px-4 py-2 rounded-md font-medium text-xs shadow-sm flex items-center space-x-2 transition-all disabled:opacity-50"
-          >
-            {capturing ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
-            <span>Capture Desktop Now</span>
-          </button>
         </div>
       </div>
 
@@ -259,7 +249,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ session, addToast,
           </div>
         ) : (
           <div ref={recentListRef} className="flex-1 min-h-0 flex items-center justify-center text-center text-gray-400 text-xs">
-            No screenshots captured yet. Click "Capture Desktop Now" above.
+            No screenshots captured yet. Screenshots are captured automatically on schedule.
           </div>
         )}
       </div>

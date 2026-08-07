@@ -183,7 +183,6 @@ export function App() {
     { to: '/', label: 'Dashboard', Icon: IconDashboard },
     { to: '/gallery', label: 'Gallery', Icon: IconGallery },
     { to: '/queue', label: 'Upload Queue', Icon: IconUpload },
-    { to: '/settings', label: 'Settings', Icon: IconSettings },
     { to: '/profile', label: 'Profile', Icon: IconProfile },
   ];
 
@@ -280,7 +279,6 @@ export function App() {
             {page === '/' && <DashboardPage session={session} addToast={addToast} onNavigate={navigate} />}
             {page === '/gallery' && <GalleryPage />}
             {page === '/queue' && <QueuePage addToast={addToast} />}
-            {page === '/settings' && <SettingsPage addToast={addToast} />}
             {page === '/profile' && <ProfilePage session={session} onLogout={requestLogout} />}
           </main>
         </div>

@@ -20,6 +20,8 @@ import {
   XCircle,
   LogOut,
   Trash2,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import axios from 'axios';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -177,6 +179,9 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
 
   // Employees Table Pagination
   const [empPageSize, setEmpPageSize] = useState<number>(10);
+  const [selectedPaused, setSelectedPaused] = useState<boolean>(false);
+  const [savingCaptureSettings, setSavingCaptureSettings] = useState<boolean>(false);
+  const [showResetPass, setShowResetPass] = useState<boolean>(false);
   const [empPage, setEmpPage] = useState<number>(1);
   const [empDropdownOpen, setEmpDropdownOpen] = useState<boolean>(false);
   const empDropdownRef = React.useRef<HTMLDivElement>(null);
@@ -247,7 +252,7 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
     if (employee.username.trim().length < 3) { show('Username must be at least 3 characters.', true); return; }
     if (!/^\S+@\S+\.\S+$/.test(employee.email.trim())) { show('Enter a valid employee email address.', true); return; }
     if (!isStrongPassword(employee.password)) {
-      show('Temporary password must be at least 12 characters and include upper/lowercase, a number, and a symbol.', true);
+      show('Temporary password must be at least 6 characters.', true);
       return;
     }
     try {
@@ -302,8 +307,8 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
   const resetEmployeePassword = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!passwordResetTarget) return;
-    if (!isStrongPassword(replacementPassword)) {
-      show('The replacement password must be at least 12 characters and include upper/lowercase, a number, and a symbol.', true);
+    if (replacementPassword.length < 6) {
+      show('New password must be at least 6 characters.', true);
       return;
     }
     try {
@@ -1308,16 +1313,26 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
             </p>
             <label className="mt-4 block text-xs font-semibold text-gray-700">
               New temporary password
-              <input
-                autoFocus
-                type="password"
-                minLength={6}
-                required
-                autoComplete="new-password"
-                value={replacementPassword}
-                onChange={(event) => setReplacementPassword(event.target.value)}
-                className="mt-1.5 w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-green-600 focus:ring-2 focus:ring-green-100"
-              />
+              <div className="relative mt-1.5">
+                <input
+                  autoFocus
+                  type={showResetPass ? 'text' : 'password'}
+                  minLength={6}
+                  required
+                  autoComplete="new-password"
+                  value={replacementPassword}
+                  onChange={(event) => setReplacementPassword(event.target.value)}
+                  className="w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-green-600 focus:ring-2 focus:ring-green-100 pr-9"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowResetPass(!showResetPass)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1 focus:outline-none"
+                  tabIndex={-1}
+                >
+                  {showResetPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </label>
             <div className="mt-5 flex justify-end gap-2">
               <button
@@ -1353,18 +1368,34 @@ function Field({
   onChange: (value: string) => void;
   type?: string;
 }) {
+  const [showPass, setShowPass] = useState(false);
+  const isPasswordType = type === 'password';
+  const effectiveType = isPasswordType ? (showPass ? 'text' : 'password') : type;
+
   return (
-    <label className="text-xs font-semibold text-gray-600">
+    <label className="text-xs font-semibold text-gray-600 block relative">
       {label}
-      <input
-        required
-        minLength={type === 'password' ? 12 : undefined}
-        type={type}
-        autoComplete={type === 'password' ? 'new-password' : 'off'}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="mt-1.5 w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2.5 text-xs font-normal outline-none focus:border-green-600 focus:ring-2 focus:ring-green-100 transition-all"
-      />
+      <div className="relative mt-1.5">
+        <input
+          required
+          minLength={isPasswordType ? 6 : undefined}
+          type={effectiveType}
+          autoComplete={isPasswordType ? 'new-password' : 'off'}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          className="w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2.5 text-xs font-normal outline-none focus:border-green-600 focus:ring-2 focus:ring-green-100 transition-all pr-9"
+        />
+        {isPasswordType && (
+          <button
+            type="button"
+            onClick={() => setShowPass(!showPass)}
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1 focus:outline-none"
+            tabIndex={-1}
+          >
+            {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+          </button>
+        )}
+      </div>
     </label>
   );
 }

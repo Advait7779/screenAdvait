@@ -19,6 +19,8 @@ import {
   Bell,
   Download,
   Trash2,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import axios from 'axios';
 import { CustomerDashboard } from './CustomerDashboard';
@@ -165,6 +167,8 @@ export function App() {
   const [session, setSession] = useState<any>(restoredSession());
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [showCustomPassword, setShowCustomPassword] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('subscription_form');
   const [companies, setCompanies] = useState<any[]>([]);
   const [subscriptions, setSubscriptions] = useState<any[]>([]);
@@ -500,8 +504,24 @@ export function App() {
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-gray-600 mb-1.5">Password</label>
-                    <input required autoComplete="current-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)}
-                      className="w-full bg-gray-50 border border-gray-200 text-gray-900 rounded-md px-3.5 py-2.5 text-sm outline-none focus:border-green-600 focus:ring-2 focus:ring-green-100 transition-all" />
+                    <div className="relative">
+                      <input
+                        required
+                        autoComplete="current-password"
+                        type={showLoginPassword ? 'text' : 'password'}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="w-full bg-gray-50 border border-gray-200 text-gray-900 rounded-md px-3.5 py-2.5 text-sm outline-none focus:border-green-600 focus:ring-2 focus:ring-green-100 transition-all pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowLoginPassword(!showLoginPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1 focus:outline-none"
+                        tabIndex={-1}
+                      >
+                        {showLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
                   </div>
                   <button disabled={loading}
                     className="w-full py-3 rounded-md text-sm font-semibold text-white disabled:opacity-50 transition-all shadow-sm mt-3 hover:shadow-md active:scale-98"
@@ -1270,13 +1290,23 @@ export function App() {
                   <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
                     New Custom Password (Optional)
                   </label>
-                  <input
-                    type="text"
-                    value={customCompanyPassword}
-                    onChange={(e) => setCustomCompanyPassword(e.target.value)}
-                    placeholder="Leave empty to auto-generate password"
-                    className="w-full bg-gray-50 border border-gray-200 rounded-md px-3 py-2.5 text-xs text-gray-900 font-mono focus:outline-none focus:border-green-600 focus:ring-1 focus:ring-green-600"
-                  />
+                  <div className="relative">
+                    <input
+                      type={showCustomPassword ? 'text' : 'password'}
+                      value={customCompanyPassword}
+                      onChange={(e) => setCustomCompanyPassword(e.target.value)}
+                      placeholder="Leave empty to auto-generate password"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-md px-3 py-2.5 text-xs text-gray-900 font-mono focus:outline-none focus:border-green-600 focus:ring-1 focus:ring-green-600 pr-9"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowCustomPassword(!showCustomPassword)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1 focus:outline-none"
+                      tabIndex={-1}
+                    >
+                      {showCustomPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                   <p className="text-[11px] text-gray-400 mt-1">
                     If left blank, a secure random temporary password will be created automatically.
                   </p>

@@ -792,7 +792,7 @@ export function App() {
                   <h2 className="text-base font-bold text-gray-900">Company Onboarding &amp; Subscription</h2>
                   <p className="text-xs text-gray-500 mt-1">Select an existing company or type a new company name to create the organization &amp; assign its subscription limits in 1 click.</p>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 items-end">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-4 items-end">
                   <label className="text-xs font-semibold text-gray-600 block">
                     Company name
                     <div className="relative mt-1.5">
@@ -877,11 +877,30 @@ export function App() {
                       value={form.maxEmployees}
                       onChange={(e) => {
                         const val = Number(e.target.value) || 1;
-                        setForm({ ...form, maxEmployees: val });
+                        setForm({ ...form, maxEmployees: val, maxDevices: val });
                       }}
                       onBlur={() => {
                         if (!form.maxEmployees || Number(form.maxEmployees) <= 0) {
-                          setForm((f) => ({ ...f, maxEmployees: 25 }));
+                          setForm((f) => ({ ...f, maxEmployees: 25, maxDevices: 25 }));
+                        }
+                      }}
+                      className="mt-1.5 w-full bg-gray-50 border border-gray-200 rounded-md px-3 py-2.5 outline-none focus:border-green-600 focus:ring-2 focus:ring-green-100 text-xs transition-all"
+                    />
+                  </label>
+
+                  <label className="text-xs font-semibold text-gray-600 block">
+                    Device Slots
+                    <input
+                      type="number"
+                      min={1}
+                      value={form.maxDevices}
+                      onChange={(e) => {
+                        const val = Number(e.target.value) || 1;
+                        setForm({ ...form, maxDevices: val });
+                      }}
+                      onBlur={() => {
+                        if (!form.maxDevices || Number(form.maxDevices) <= 0) {
+                          setForm((f) => ({ ...f, maxDevices: form.maxEmployees }));
                         }
                       }}
                       className="mt-1.5 w-full bg-gray-50 border border-gray-200 rounded-md px-3 py-2.5 outline-none focus:border-green-600 focus:ring-2 focus:ring-green-100 text-xs transition-all"
@@ -890,7 +909,7 @@ export function App() {
 
                   <div className="flex items-end">
                     <button onClick={saveSubscription} disabled={!form.companyName.trim()}
-                      className="w-full text-white px-4 py-2.5 rounded-md text-xs font-semibold flex items-center justify-center gap-1.5 shadow-sm disabled:opacity-50 transition-all"
+                      className="w-full text-white px-3 py-2.5 rounded-md text-xs font-semibold flex items-center justify-center gap-1 shadow-sm disabled:opacity-50 transition-all shrink-0"
                       style={{ background: 'linear-gradient(135deg, #15803d, #166534)' }}>
                       <Plus className="w-4 h-4" /> Save Subscription
                     </button>

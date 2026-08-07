@@ -1,6 +1,6 @@
 {
   "name": "screenadvait-desktop",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "ScreenAdvait enterprise desktop capture client",
   "author": "ScreenAdvait",
   "private": true,
@@ -62,8 +62,8 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
+      "createDesktopShortcut": false,
+      "createStartMenuShortcut": false,
       "shortcutName": "ScreenAdvait Enterprise",
       "include": "build/installer.nsh"
     }

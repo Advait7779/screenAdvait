@@ -137,4 +137,62 @@ export class CompanyService {
       temporaryPassword: passwordToSet,
     };
   }
+
+  async deleteCompany(companyId: string, superAdminUserId: string) {
+    const company = await this.prisma.company.findUnique({
+      where: { id: companyId },
+      include: {
+        _count: { select: { users: true, licenses: true, screenshots: true, subscriptions: true } },
+      },
+    });
+
+    if (!company) {
+      throw new NotFoundException('Company not found');
+    }
+
+    // Don't allow deleting DEMO company (system default)
+    if (company.code === 'DEMO') {
+      throw new BadRequestException('Cannot delete the system default Demo company');
+    }
+
+    // Collect screenshot file keys for disk cleanup
+    const screenshots = await this.prisma.screenshot.findMany({
+      where: { companyId },
+      select: { fileKey: true },
+    });
+
+    const deletedCounts = {
+      users: company._count.users,
+      licenses: company._count.licenses,
+      screenshots: company._count.screenshots,
+      subscriptions: company._count.subscriptions,
+    };
+
+    // Delete the company — cascading deletes handle all child records
+    await this.prisma.company.delete({
+      where: { id: companyId },
+    });
+
+    // Clean up screenshot files from disk (non-blocking)
+    const fs = await import('fs');
+    const path = await import('path');
+    const storagePath = process.env.LOCAL_STORAGE_PATH || './storage';
+    for (const ss of screenshots) {
+      try {
+        const fullPath = path.resolve(storagePath, ss.fileKey);
+        if (fs.existsSync(fullPath)) {
+          fs.unlinkSync(fullPath);
+        }
+      } catch {
+        // Ignore file cleanup errors
+      }
+    }
+
+    return {
+      success: true,
+      deletedCompany: company.name,
+      deletedCode: company.code,
+      deletedCounts,
+    };
+  }
 }

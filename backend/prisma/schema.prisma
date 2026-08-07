@@ -129,7 +129,7 @@ model License {
   companyId        String
   company          Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
   subscriptionId   String
-  subscription     Subscription  @relation(fields: [subscriptionId], references: [id], onDelete: Restrict)
+  subscription     Subscription  @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
   userId           String?
   user             User?         @relation(fields: [userId], references: [id])
   plan             LicensePlan   @default(MONTHLY)
@@ -246,7 +246,7 @@ model LoginLog {
 model AuditLog {
   id        String   @id @default(uuid())
   companyId String?
-  company   Company? @relation(fields: [companyId], references: [id])
+  company   Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
   userId    String?
   user      User?    @relation(fields: [userId], references: [id])
   action    String
@@ -263,7 +263,7 @@ model AuditLog {
 model Invoice {
   id          String   @id @default(uuid())
   companyId   String
-  company     Company  @relation(fields: [companyId], references: [id])
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   amount      Decimal  @db.Decimal(12, 2)
   currency    String   @default("USD")
   status      String
@@ -311,7 +311,7 @@ model Subscription {
 model Report {
   id          String   @id @default(uuid())
   companyId   String
-  company     Company  @relation(fields: [companyId], references: [id])
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   title       String
   reportType  String
   fileUrl     String

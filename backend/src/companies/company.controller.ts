@@ -38,4 +38,12 @@ export class CompanyController {
       body?.password,
     );
   }
+
+  @Post(':companyId/delete')
+  async deleteCompany(
+    @Param('companyId') companyId: string,
+    @Req() req: any,
+  ) {
+    return this.companyService.deleteCompany(companyId, req.user.id);
+  }
 }

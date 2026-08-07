@@ -18,6 +18,7 @@ import {
   LogOut,
   Bell,
   Download,
+  Trash2,
 } from 'lucide-react';
 import axios from 'axios';
 import { CustomerDashboard } from './CustomerDashboard';
@@ -201,6 +202,9 @@ export function App() {
     temporaryPassword: string;
   } | null>(null);
   const [resetLoading, setResetLoading] = useState(false);
+
+  // Delete Company State
+  const [deleteTargetCompany, setDeleteTargetCompany] = useState<any>(null);
 
   // Subscriptions Table Pagination
   const [subPageSize, setSubPageSize] = useState<number>(10);
@@ -402,6 +406,18 @@ export function App() {
       const message = apiErrorMessage(err, 'Status update failed');
       setError(message);
       addToast(message, 'error');
+    }
+  };
+
+  const deleteCompany = async (companyId: string) => {
+    try {
+      const res = await axios.post(`${API_URL}/companies/${companyId}/delete`, {}, auth(token));
+      addToast(`Company "${res.data.deletedCompany}" deleted successfully (${res.data.deletedCounts.users} users, ${res.data.deletedCounts.licenses} licenses, ${res.data.deletedCounts.screenshots} screenshots removed).`, 'success');
+      setDeleteTargetCompany(null);
+      await fetchAdminData();
+    } catch (err: any) {
+      addToast(apiErrorMessage(err, 'Failed to delete company'), 'error');
+      setDeleteTargetCompany(null);
     }
   };
 
@@ -997,6 +1013,12 @@ export function App() {
                                   {item.status === 'ACTIVE'
                                     ? <button onClick={() => changeStatus(item.id, 'SUSPENDED')} className="px-2.5 py-1 border border-amber-200 rounded-md text-amber-700 hover:bg-amber-50 text-[11px] font-medium transition-colors"><PauseCircle className="inline w-3 h-3 mr-1" />Suspend</button>
                                     : <button onClick={() => changeStatus(item.id, 'ACTIVE')} className="px-2.5 py-1 border border-green-200 rounded-md text-green-700 hover:bg-green-50 text-[11px] font-medium transition-colors"><PlayCircle className="inline w-3 h-3 mr-1" />Activate</button>}
+                                  <button
+                                    onClick={() => setDeleteTargetCompany(item.company)}
+                                    className="px-2.5 py-1 border border-red-200 rounded-md text-red-700 hover:bg-red-50 text-[11px] font-medium transition-colors"
+                                  >
+                                    <Trash2 className="inline w-3 h-3 mr-1" />Delete
+                                  </button>
                                 </td>
                               </tr>
                             ))}
@@ -1283,6 +1305,53 @@ export function App() {
                 </div>
               </form>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Delete Company Confirmation Modal */}
+      {deleteTargetCompany && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/55 p-4" role="dialog">
+          <div className="bg-white rounded-lg shadow-2xl w-full max-w-md p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-gray-900">Delete Company Permanently</h3>
+                <p className="text-xs text-gray-500 mt-0.5">This action cannot be undone.</p>
+              </div>
+            </div>
+
+            <div className="bg-red-50 border border-red-200 rounded-md p-3.5 text-xs text-red-800 space-y-1">
+              <p className="font-semibold">You are about to permanently delete:</p>
+              <p className="font-bold text-red-900 text-sm">{deleteTargetCompany.name} ({deleteTargetCompany.code})</p>
+              <p className="mt-2">This will permanently remove:</p>
+              <ul className="list-disc list-inside space-y-0.5 ml-1">
+                <li>All company admin & employee accounts</li>
+                <li>All license keys & device bindings</li>
+                <li>All captured screenshots & files</li>
+                <li>All subscriptions, invoices & audit logs</li>
+              </ul>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setDeleteTargetCompany(null)}
+                className="px-4 py-2 rounded-md border border-gray-200 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => deleteCompany(deleteTargetCompany.id)}
+                className="px-4 py-2 bg-red-600 text-white rounded-md text-xs font-semibold hover:bg-red-700 transition-colors shadow-sm flex items-center gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Delete Company Forever</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

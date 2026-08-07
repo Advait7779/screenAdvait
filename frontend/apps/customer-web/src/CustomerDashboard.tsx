@@ -175,6 +175,11 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
   const [archiveDropdownOpen, setArchiveDropdownOpen] = useState<boolean>(false);
   const archiveDropdownRef = React.useRef<HTMLDivElement>(null);
 
+  // Capture Settings state for explicit Save
+  const [selectedInterval, setSelectedInterval] = useState<number>(900);
+  const [selectedPaused, setSelectedPaused] = useState<boolean>(false);
+  const [savingCaptureSettings, setSavingCaptureSettings] = useState<boolean>(false);
+
   // Google Drive Connection State
   const [driveConn, setDriveConn] = useState<{
     connected: boolean;
@@ -307,6 +312,10 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
       ]);
       setScreenshots(shots);
       setOverview(company.data);
+      if (company.data?.captureSettings) {
+        setSelectedInterval(company.data.captureSettings.captureIntervalSeconds ?? 900);
+        setSelectedPaused(company.data.captureSettings.isCapturePaused ?? false);
+      }
       if (isManual) addToast('Workspace data refreshed.', 'info');
     } catch (error: any) {
       show(apiErrorMessage(error, 'Could not load company data'), true);
@@ -1060,7 +1069,7 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
                   );
                 })()}
               </section>
-            ) : (
+            ) : view === 'employees' ? (
               <>
                 {/* ── Create Employee form ──────────────────────────── */}
                 <section className="mb-6 rounded-md border border-gray-200 bg-white p-5 shadow-sm">
@@ -1308,21 +1317,20 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
                   })()}
                 </section>
               </>
-            )}
-
-            {/* ── Capture Settings view ──────────────────────────── */}
-            {view === 'capture-settings' && (
+            ) : view === 'capture-settings' ? (
               <section className="max-w-xl">
                 <div className="mb-4">
                   <h2 className="text-base font-bold text-gray-900">Capture Settings</h2>
-                  <p className="text-xs text-gray-500 mt-0.5">Control screenshot capture interval and pause state for all employees. Changes sync to desktop apps automatically.</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Configure screenshot interval and pause status for all employee devices.</p>
                 </div>
 
-                <div className="bg-white border border-gray-200 rounded-md shadow-sm p-5 space-y-5">
+                <div className="bg-white border border-gray-200 rounded-md shadow-sm p-6 space-y-6">
                   {/* Interval selector */}
                   <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-2">Screenshot Capture Interval</label>
-                    <div className="grid grid-cols-3 gap-2">
+                    <label className="block text-xs font-semibold text-gray-700 mb-2">
+                      Screenshot Capture Interval
+                    </label>
+                    <div className="grid grid-cols-3 gap-2.5">
                       {[
                         { value: 60, label: '1 min' },
                         { value: 300, label: '5 min' },
@@ -1331,29 +1339,20 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
                         { value: 1800, label: '30 min' },
                         { value: 3600, label: '60 min' },
                       ].map((opt) => {
-                        const current = overview?.captureSettings?.captureIntervalSeconds ?? 900;
-                        const isSelected = current === opt.value;
+                        const isSelected = selectedInterval === opt.value;
                         return (
                           <button
                             key={opt.value}
                             type="button"
-                            onClick={async () => {
-                              try {
-                                await axios.post(`${API_URL}/company-admin/capture-settings`, { captureIntervalSeconds: opt.value }, auth(token));
-                                addToast(`Capture interval updated to ${opt.label}`, 'success');
-                                fetchCustomerData();
-                              } catch (err: any) {
-                                addToast(apiErrorMessage(err, 'Failed to update interval'), 'error');
-                              }
-                            }}
-                            className={`px-3 py-2.5 rounded-md text-xs font-semibold border transition-all ${
+                            onClick={() => setSelectedInterval(opt.value)}
+                            className={`px-3 py-3 rounded-md text-xs font-semibold border transition-all ${
                               isSelected
-                                ? 'bg-green-700 text-white border-green-700 shadow-sm'
+                                ? 'bg-green-700 text-white border-green-700 shadow-sm ring-2 ring-green-200'
                                 : 'bg-white text-gray-700 border-gray-200 hover:border-green-600 hover:bg-green-50'
                             }`}
                           >
                             {opt.label}
-                            {opt.value === 900 && <span className="block text-[10px] font-normal opacity-75">(Default)</span>}
+                            {opt.value === 900 && <span className="block text-[10px] font-normal opacity-80">(Default)</span>}
                           </button>
                         );
                       })}
@@ -1361,50 +1360,70 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
                   </div>
 
                   {/* Global pause toggle */}
-                  <div className="border-t border-gray-100 pt-4">
-                    <label className="block text-xs font-semibold text-gray-700 mb-2">Global Capture Control</label>
+                  <div className="border-t border-gray-100 pt-5">
+                    <label className="block text-xs font-semibold text-gray-700 mb-2">Global Capture Status</label>
                     <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-md p-4">
                       <div>
-                        <div className="text-sm font-semibold text-gray-900">
-                          {overview?.captureSettings?.isCapturePaused ? '⏸ Capture Paused' : '● Capture Active'}
+                        <div className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                          <span className={`h-2.5 w-2.5 rounded-full ${selectedPaused ? 'bg-red-500' : 'bg-green-500 animate-pulse'}`}></span>
+                          {selectedPaused ? 'Capture Paused' : 'Capture Active'}
                         </div>
-                        <p className="text-xs text-gray-500 mt-0.5">
-                          {overview?.captureSettings?.isCapturePaused
+                        <p className="text-xs text-gray-500 mt-1">
+                          {selectedPaused
                             ? 'All employee desktop apps will stop capturing screenshots.'
-                            : 'All employee desktop apps are actively capturing screenshots.'}
+                            : 'All employee desktop apps will capture screenshots on interval.'}
                         </p>
                       </div>
                       <button
                         type="button"
-                        onClick={async () => {
-                          const newState = !overview?.captureSettings?.isCapturePaused;
-                          try {
-                            await axios.post(`${API_URL}/company-admin/capture-settings`, { isCapturePaused: newState }, auth(token));
-                            addToast(newState ? 'Capture paused for all employees' : 'Capture resumed for all employees', 'success');
-                            fetchCustomerData();
-                          } catch (err: any) {
-                            addToast(apiErrorMessage(err, 'Failed to update pause state'), 'error');
-                          }
-                        }}
+                        onClick={() => setSelectedPaused(!selectedPaused)}
                         className={`px-4 py-2 rounded-md text-xs font-semibold transition-all shadow-sm ${
-                          overview?.captureSettings?.isCapturePaused
+                          selectedPaused
                             ? 'bg-green-700 hover:bg-green-800 text-white'
-                            : 'bg-red-600 hover:bg-red-700 text-white'
+                            : 'bg-amber-600 hover:bg-amber-700 text-white'
                         }`}
                       >
-                        {overview?.captureSettings?.isCapturePaused ? '▶ Resume All' : '⏸ Pause All'}
+                        {selectedPaused ? '▶ Set to Active' : '⏸ Set to Paused'}
                       </button>
                     </div>
                   </div>
 
-                  <div className="border-t border-gray-100 pt-3">
-                    <p className="text-[11px] text-gray-400 leading-relaxed">
-                      💡 Desktop apps sync these settings automatically every 60 seconds during their license heartbeat check. Changes will apply to all connected employee devices within 1 minute.
+                  {/* Save Capture Settings Button */}
+                  <div className="border-t border-gray-100 pt-5 flex items-center justify-between gap-4">
+                    <p className="text-[11px] text-gray-400 leading-relaxed max-w-xs">
+                      💡 Click Save below to apply these settings across all connected employee devices.
                     </p>
+                    <button
+                      type="button"
+                      disabled={savingCaptureSettings}
+                      onClick={async () => {
+                        setSavingCaptureSettings(true);
+                        try {
+                          await axios.post(
+                            `${API_URL}/company-admin/capture-settings`,
+                            {
+                              captureIntervalSeconds: selectedInterval,
+                              isCapturePaused: selectedPaused,
+                            },
+                            auth(token),
+                          );
+                          addToast('Capture settings saved successfully!', 'success');
+                          fetchCustomerData();
+                        } catch (err: any) {
+                          addToast(apiErrorMessage(err, 'Failed to save capture settings'), 'error');
+                        } finally {
+                          setSavingCaptureSettings(false);
+                        }
+                      }}
+                      className="px-5 py-2.5 rounded-md text-xs font-bold text-white shadow-md hover:shadow-lg disabled:opacity-50 transition-all shrink-0"
+                      style={{ background: 'linear-gradient(135deg, #15803d, #166534)' }}
+                    >
+                      {savingCaptureSettings ? 'Saving...' : '💾 Save Capture Settings'}
+                    </button>
                   </div>
                 </div>
               </section>
-            )}
+            ) : null}
 
           </div>
         </main>

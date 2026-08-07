@@ -5,11 +5,16 @@ import { CreateCompanyInput } from '@screenadvait/shared-utils';
 import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
 
+export type CreateCompanyParams = CreateCompanyInput & {
+  adminUsername?: string;
+  adminPassword?: string;
+};
+
 @Injectable()
 export class CompanyService {
   constructor(private prisma: PrismaService) {}
 
-  async createCompany(input: CreateCompanyInput, createdByUserId: string) {
+  async createCompany(input: CreateCompanyParams, createdByUserId: string) {
     const existing = await this.prisma.company.findFirst({
       where: {
         OR: [
@@ -23,7 +28,12 @@ export class CompanyService {
       throw new ConflictException('A company with this name or code already exists');
     }
 
-    const temporaryPassword = `${crypto.randomBytes(18).toString('base64url')}Aa1!`;
+    const desiredUsername = (input.adminUsername && input.adminUsername.trim().length >= 3)
+      ? input.adminUsername.trim()
+      : input.code.toLowerCase();
+    const temporaryPassword = (input.adminPassword && input.adminPassword.trim().length >= 6)
+      ? input.adminPassword.trim()
+      : `${crypto.randomBytes(12).toString('base64url')}Aa1!`;
     const passwordHash = await bcrypt.hash(temporaryPassword, 12);
 
     const maxUsers = input.maxUsers || 10;
@@ -41,7 +51,7 @@ export class CompanyService {
             users: {
               create: {
                 email: input.contactEmail,
-                username: input.code.toLowerCase(),
+                username: desiredUsername,
                 fullName: `${input.name} Admin`,
                 passwordHash,
                 role: 'COMPANY_ADMIN',
@@ -56,7 +66,7 @@ export class CompanyService {
             action: 'COMPANY_CREATED',
             entity: 'Company',
             entityId: created.id,
-            details: { code: created.code },
+            details: { code: created.code, username: desiredUsername },
           },
         });
         return created;
@@ -71,7 +81,7 @@ export class CompanyService {
       ...company,
       maxStorageMb: Number(company.maxStorageMb),
       adminCredentials: {
-        username: input.code.toLowerCase(),
+        username: desiredUsername,
         temporaryPassword,
       },
     };

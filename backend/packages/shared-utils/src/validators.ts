@@ -42,6 +42,8 @@ export const CreateCompanySchema = z.object({
   contactEmail: z.string().email('Invalid email address'),
   contactPhone: z.string().optional(),
   maxUsers: z.number().int().positive().default(10),
+  adminUsername: z.string().min(3, 'Admin username must be at least 3 characters').optional(),
+  adminPassword: z.string().min(6, 'Admin password must be at least 6 characters').optional(),
 });
 
 export type CreateCompanyInput = z.infer<typeof CreateCompanySchema>;

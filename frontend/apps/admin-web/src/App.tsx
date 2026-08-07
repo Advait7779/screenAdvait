@@ -185,17 +185,15 @@ export function App() {
   } | null>(null);
   const [planMenuOpen, setPlanMenuOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [form, setForm] = useState<{
-    companyName: string;
-    plan: string;
-    maxEmployees: number | string;
-    maxDevices: number | string;
-  }>({
+  const [form, setForm] = useState({
     companyName: '',
+    adminUsername: '',
+    adminPassword: '',
     plan: 'MONTHLY',
     maxEmployees: 25,
     maxDevices: 25,
   });
+  const [showAdminPass, setShowAdminPass] = useState(false);
 
   // Reset Company Admin Password State
   const [resetPasswordTargetCompany, setResetPasswordTargetCompany] = useState<any>(null);
@@ -317,11 +315,10 @@ export function App() {
         const baseCode = trimmedName
           .toUpperCase()
           .replace(/[^A-Z0-9]/g, '')
-          .slice(0, 6) || 'COMP';
-        const uniqueSuffix = `${Date.now().toString(36).slice(-4)}${Math.random()
-          .toString(36)
-          .slice(2, 4)}`.toUpperCase();
-        const sanitizedCode = `${baseCode}${uniqueSuffix}`.slice(0, 12);
+          .slice(0, 10) || 'COMPANY';
+        const sanitizedCode = baseCode;
+        const desiredUsername = form.adminUsername.trim() || baseCode.toLowerCase();
+
         const newCompRes = await axios.post(
           `${API_URL}/companies`,
           {
@@ -329,6 +326,8 @@ export function App() {
             code: sanitizedCode,
             contactEmail: `admin+${sanitizedCode.toLowerCase()}@screenadvait.example`,
             maxUsers: maxUsersNum,
+            adminUsername: desiredUsername,
+            adminPassword: form.adminPassword.trim() || undefined,
           },
           auth(token),
         );
@@ -793,16 +792,57 @@ export function App() {
                   <h2 className="text-base font-bold text-gray-900">Company Onboarding &amp; Subscription</h2>
                   <p className="text-xs text-gray-500 mt-1">Select an existing company or type a new company name to create the organization &amp; assign its subscription limits in 1 click.</p>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 items-end">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 items-end">
                   <label className="text-xs font-semibold text-gray-600 block">
                     Company name
                     <div className="relative mt-1.5">
                       <input
                         value={form.companyName}
-                        onChange={(e) => setForm({ ...form, companyName: e.target.value })}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          const suggestedUser = val.toLowerCase().replace(/[^a-z0-9]/g, '');
+                          setForm((f) => ({
+                            ...f,
+                            companyName: val,
+                            adminUsername: f.adminUsername ? f.adminUsername : suggestedUser,
+                          }));
+                        }}
                         className="w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2.5 outline-none focus:border-green-600 focus:ring-2 focus:ring-green-100 text-xs font-normal text-gray-800 transition-all"
                         placeholder="Type company name"
                       />
+                    </div>
+                  </label>
+
+                  <label className="text-xs font-semibold text-gray-600 block">
+                    Admin Username
+                    <div className="relative mt-1.5">
+                      <input
+                        value={form.adminUsername}
+                        onChange={(e) => setForm({ ...form, adminUsername: e.target.value })}
+                        className="w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2.5 outline-none focus:border-green-600 focus:ring-2 focus:ring-green-100 text-xs font-normal text-gray-800 transition-all"
+                        placeholder="e.g. balasaheb"
+                      />
+                    </div>
+                  </label>
+
+                  <label className="text-xs font-semibold text-gray-600 block">
+                    Admin Password (Optional)
+                    <div className="relative mt-1.5">
+                      <input
+                        type={showAdminPass ? 'text' : 'password'}
+                        value={form.adminPassword}
+                        onChange={(e) => setForm({ ...form, adminPassword: e.target.value })}
+                        className="w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2.5 outline-none focus:border-green-600 focus:ring-2 focus:ring-green-100 text-xs font-normal text-gray-800 transition-all pr-8"
+                        placeholder="Min 6 chars or auto"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowAdminPass(!showAdminPass)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1"
+                        tabIndex={-1}
+                      >
+                        {showAdminPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
                     </div>
                   </label>
 
@@ -836,7 +876,7 @@ export function App() {
                       min={1}
                       value={form.maxEmployees}
                       onChange={(e) => {
-                        const val = e.target.value;
+                        const val = Number(e.target.value) || 1;
                         setForm({ ...form, maxEmployees: val });
                       }}
                       onBlur={() => {
@@ -848,28 +888,9 @@ export function App() {
                     />
                   </label>
 
-                  <label className="text-xs font-semibold text-gray-600 block">
-                    Device Slots
-                    <input
-                      type="number"
-                      min={1}
-                      value={form.maxDevices}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setForm({ ...form, maxDevices: val });
-                      }}
-                      onBlur={() => {
-                        if (!form.maxDevices || Number(form.maxDevices) <= 0) {
-                          setForm((f) => ({ ...f, maxDevices: 25 }));
-                        }
-                      }}
-                      className="mt-1.5 w-full bg-gray-50 border border-gray-200 rounded-md px-3 py-2.5 outline-none focus:border-green-600 focus:ring-2 focus:ring-green-100 text-xs transition-all"
-                    />
-                  </label>
-
-                  <div className="sm:col-span-2 lg:col-span-1 flex items-end">
+                  <div className="flex items-end">
                     <button onClick={saveSubscription} disabled={!form.companyName.trim()}
-                      className="w-full text-white px-5 py-2.5 rounded-md text-xs font-semibold flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 transition-all"
+                      className="w-full text-white px-4 py-2.5 rounded-md text-xs font-semibold flex items-center justify-center gap-1.5 shadow-sm disabled:opacity-50 transition-all"
                       style={{ background: 'linear-gradient(135deg, #15803d, #166534)' }}>
                       <Plus className="w-4 h-4" /> Save Subscription
                     </button>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Camera, CloudUpload, Clock, HardDrive, CheckCircle2, RefreshCw, Timer, Pause, Play } from 'lucide-react';
+import { Camera, CloudUpload, Clock, HardDrive, CheckCircle2, RefreshCw, Timer, Shield } from 'lucide-react';
 
 interface DashboardPageProps {
   session: any;
@@ -77,17 +77,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ session, addToast,
     return () => clearInterval(timer);
   }, [engineStatus]);
 
-  const toggleEngine = async () => {
-    if (engineStatus.isPaused) {
-      await window.electronAPI.resumeService();
-      addToast?.('Screenshot engine resumed', 'info');
-    } else {
-      await window.electronAPI.pauseService();
-      addToast?.('Screenshot engine paused', 'info');
-    }
-    await fetchStatus();
-  };
-
   const handleCaptureNow = async () => {
     setCapturing(true);
     setToastMessage('');
@@ -147,14 +136,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ session, addToast,
             </div>
           </div>
 
-          <button
-            onClick={toggleEngine}
-            disabled={Boolean(engineStatus.entitlementError)}
-            className="bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 px-3 py-2 rounded-md font-medium text-xs flex items-center space-x-2"
-          >
-            {engineStatus.isPaused ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
-            <span>{engineStatus.isPaused ? 'Resume' : 'Pause'}</span>
-          </button>
+          <div className="bg-gray-50 border border-gray-200 px-3 py-2 rounded-md flex items-center space-x-2 text-gray-600">
+            <Shield className="w-3.5 h-3.5 text-gray-500" />
+            <span className="text-xs font-medium">Managed by Admin</span>
+          </div>
 
           <button
             onClick={handleCaptureNow}

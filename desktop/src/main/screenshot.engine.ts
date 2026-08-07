@@ -21,7 +21,7 @@ let captureInProgress = false;
 let uploadInProgress = false;
 let targetNextCaptureTime = 0;
 let lastCaptureTime = 0;
-let currentIntervalSeconds = 300;
+let currentIntervalSeconds = 900;
 let paused = false;
 let apiConnected = false;
 let entitlementError = '';
@@ -71,7 +71,7 @@ function readSetting(key: string, fallback: string) {
 
 function parseIntervalSeconds(value: string) {
   const parsed = Number.parseInt(value, 10);
-  return ALLOWED_INTERVALS.has(parsed) ? parsed : 300;
+  return ALLOWED_INTERVALS.has(parsed) ? parsed : 900;
 }
 
 export function getEngineStatus() {
@@ -90,7 +90,7 @@ export function getEngineStatus() {
 
 export async function startScreenshotEngine(forceReset = false) {
   if (!getSession()) return;
-  const interval = parseIntervalSeconds(readSetting('screenshotInterval', '300'));
+  const interval = parseIntervalSeconds(readSetting('screenshotInterval', '900'));
   currentIntervalSeconds = interval;
   if (forceReset) {
     entitlementError = '';
@@ -435,6 +435,28 @@ async function ensureEntitlementActive() {
       blockForEntitlement(response.data.message || 'Company subscription or employee license is inactive');
       return false;
     }
+
+    // Sync admin-controlled capture settings from server
+    if (response.data.captureIntervalSeconds && ALLOWED_INTERVALS.has(response.data.captureIntervalSeconds)) {
+      const serverInterval = response.data.captureIntervalSeconds;
+      if (serverInterval !== currentIntervalSeconds) {
+        currentIntervalSeconds = serverInterval;
+        writeSetting('screenshotInterval', String(serverInterval));
+        // Reschedule with new interval
+        if (!paused) scheduleNextCapture();
+      }
+    }
+    if (response.data.isCapturePaused === true && !paused) {
+      paused = true;
+      targetNextCaptureTime = 0;
+      writeSetting('capturePaused', 'true');
+      clearCaptureTimer();
+    } else if (response.data.isCapturePaused === false && paused && !entitlementPaused) {
+      paused = false;
+      writeSetting('capturePaused', 'false');
+      scheduleNextCapture();
+    }
+
     entitlementError = '';
     if (entitlementPaused) {
       entitlementPaused = false;

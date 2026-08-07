@@ -65,6 +65,10 @@ export class CompanyAdminService {
           .reduce((sum, license) => sum + license.maxDevices, 0),
       0,
     );
+    const company = await this.prisma.company.findUnique({
+      where: { id: companyId },
+      select: { captureIntervalSeconds: true, isCapturePaused: true },
+    });
     return {
       subscription: subscription
         ? { ...subscription, maxStorageMb: Number(subscription.maxStorageMb) }
@@ -73,6 +77,10 @@ export class CompanyAdminService {
         employees: employees.length,
         allocatedDeviceSlots: deviceSlots,
         storageMb: Number(storage._sum.fileSize || BigInt(0)) / 1024 / 1024,
+      },
+      captureSettings: {
+        captureIntervalSeconds: company?.captureIntervalSeconds ?? 900,
+        isCapturePaused: company?.isCapturePaused ?? false,
       },
       employees,
     };
@@ -629,5 +637,46 @@ export class CompanyAdminService {
       where: { companyId },
     });
     return { connected: false };
+  }
+
+  async getCaptureSettings(companyId: string) {
+    const company = await this.prisma.company.findUnique({
+      where: { id: companyId },
+      select: { captureIntervalSeconds: true, isCapturePaused: true },
+    });
+    if (!company) throw new NotFoundException('Company not found');
+    return company;
+  }
+
+  async updateCaptureSettings(
+    companyId: string,
+    input: { captureIntervalSeconds?: number; isCapturePaused?: boolean },
+  ) {
+    const ALLOWED_INTERVALS = [60, 300, 600, 900, 1800, 3600];
+    const data: Record<string, any> = {};
+
+    if (input.captureIntervalSeconds !== undefined) {
+      if (!ALLOWED_INTERVALS.includes(input.captureIntervalSeconds)) {
+        throw new ForbiddenException(
+          `Capture interval must be one of: ${ALLOWED_INTERVALS.join(', ')} seconds`,
+        );
+      }
+      data.captureIntervalSeconds = input.captureIntervalSeconds;
+    }
+
+    if (input.isCapturePaused !== undefined) {
+      data.isCapturePaused = input.isCapturePaused;
+    }
+
+    if (Object.keys(data).length === 0) {
+      return this.getCaptureSettings(companyId);
+    }
+
+    const updated = await this.prisma.company.update({
+      where: { id: companyId },
+      data,
+      select: { captureIntervalSeconds: true, isCapturePaused: true },
+    });
+    return updated;
   }
 }

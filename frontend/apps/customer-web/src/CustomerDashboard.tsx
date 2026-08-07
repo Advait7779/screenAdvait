@@ -160,7 +160,7 @@ interface CustomerDashboardProps {
 export function CustomerDashboard({ token, session, onLogout }: CustomerDashboardProps) {
   const [screenshots, setScreenshots] = useState<any[]>([]);
   const [overview, setOverview] = useState<any>(null);
-  const [view, setView] = useState<'captures' | 'all-screenshots' | 'employees'>('employees');
+  const [view, setView] = useState<'captures' | 'all-screenshots' | 'employees' | 'capture-settings'>('employees');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [messageIsError, setMessageIsError] = useState(false);
@@ -504,6 +504,7 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
     { id: 'employees' as const, label: 'Employees & Keys', icon: <IconEmployees />, iconColor: '#60a5fa' },
     { id: 'captures' as const, label: 'Employee Captures', icon: <IconCaptures />, iconColor: '#4ade80' },
     { id: 'all-screenshots' as const, label: 'All Screenshots', icon: <IconAllScreenshots />, iconColor: '#a78bfa' },
+    { id: 'capture-settings' as const, label: 'Capture Settings', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 6v6m8.66-14.66l-4.24 4.24M7.76 16.24l-4.24 4.24M23 12h-6m-6 0H1m20.66 8.66l-4.24-4.24M7.76 7.76 3.52 3.52"/></svg>, iconColor: '#f59e0b' },
   ];
 
   const kpiItems = [
@@ -1307,6 +1308,102 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
                   })()}
                 </section>
               </>
+            )}
+
+            {/* ── Capture Settings view ──────────────────────────── */}
+            {view === 'capture-settings' && (
+              <section className="max-w-xl">
+                <div className="mb-4">
+                  <h2 className="text-base font-bold text-gray-900">Capture Settings</h2>
+                  <p className="text-xs text-gray-500 mt-0.5">Control screenshot capture interval and pause state for all employees. Changes sync to desktop apps automatically.</p>
+                </div>
+
+                <div className="bg-white border border-gray-200 rounded-md shadow-sm p-5 space-y-5">
+                  {/* Interval selector */}
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-2">Screenshot Capture Interval</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        { value: 60, label: '1 min' },
+                        { value: 300, label: '5 min' },
+                        { value: 600, label: '10 min' },
+                        { value: 900, label: '15 min' },
+                        { value: 1800, label: '30 min' },
+                        { value: 3600, label: '60 min' },
+                      ].map((opt) => {
+                        const current = overview?.captureSettings?.captureIntervalSeconds ?? 900;
+                        const isSelected = current === opt.value;
+                        return (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={async () => {
+                              try {
+                                await axios.post(`${API_URL}/company-admin/capture-settings`, { captureIntervalSeconds: opt.value }, auth(token));
+                                addToast(`Capture interval updated to ${opt.label}`, 'success');
+                                fetchCustomerData();
+                              } catch (err: any) {
+                                addToast(apiErrorMessage(err, 'Failed to update interval'), 'error');
+                              }
+                            }}
+                            className={`px-3 py-2.5 rounded-md text-xs font-semibold border transition-all ${
+                              isSelected
+                                ? 'bg-green-700 text-white border-green-700 shadow-sm'
+                                : 'bg-white text-gray-700 border-gray-200 hover:border-green-600 hover:bg-green-50'
+                            }`}
+                          >
+                            {opt.label}
+                            {opt.value === 900 && <span className="block text-[10px] font-normal opacity-75">(Default)</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Global pause toggle */}
+                  <div className="border-t border-gray-100 pt-4">
+                    <label className="block text-xs font-semibold text-gray-700 mb-2">Global Capture Control</label>
+                    <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-md p-4">
+                      <div>
+                        <div className="text-sm font-semibold text-gray-900">
+                          {overview?.captureSettings?.isCapturePaused ? '⏸ Capture Paused' : '● Capture Active'}
+                        </div>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          {overview?.captureSettings?.isCapturePaused
+                            ? 'All employee desktop apps will stop capturing screenshots.'
+                            : 'All employee desktop apps are actively capturing screenshots.'}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const newState = !overview?.captureSettings?.isCapturePaused;
+                          try {
+                            await axios.post(`${API_URL}/company-admin/capture-settings`, { isCapturePaused: newState }, auth(token));
+                            addToast(newState ? 'Capture paused for all employees' : 'Capture resumed for all employees', 'success');
+                            fetchCustomerData();
+                          } catch (err: any) {
+                            addToast(apiErrorMessage(err, 'Failed to update pause state'), 'error');
+                          }
+                        }}
+                        className={`px-4 py-2 rounded-md text-xs font-semibold transition-all shadow-sm ${
+                          overview?.captureSettings?.isCapturePaused
+                            ? 'bg-green-700 hover:bg-green-800 text-white'
+                            : 'bg-red-600 hover:bg-red-700 text-white'
+                        }`}
+                      >
+                        {overview?.captureSettings?.isCapturePaused ? '▶ Resume All' : '⏸ Pause All'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-gray-100 pt-3">
+                    <p className="text-[11px] text-gray-400 leading-relaxed">
+                      💡 Desktop apps sync these settings automatically every 60 seconds during their license heartbeat check. Changes will apply to all connected employee devices within 1 minute.
+                    </p>
+                  </div>
+                </div>
+              </section>
             )}
 
           </div>

@@ -206,6 +206,10 @@ export class LicenseService {
 
   async getCurrentStatus(licenseId: string) {
     const entitlement = await this.entitlements.getLicenseEntitlement(licenseId);
+    const company = await this.prisma.company.findUnique({
+      where: { id: entitlement.license.companyId },
+      select: { captureIntervalSeconds: true, isCapturePaused: true },
+    });
     return {
       active: entitlement.active,
       effectiveStatus: entitlement.effectiveStatus,
@@ -215,6 +219,8 @@ export class LicenseService {
       subscriptionStatus: entitlement.subscription.status,
       subscriptionEndDate: entitlement.subscription.endDate.toISOString(),
       effectiveExpiryDate: entitlement.effectiveExpiryDate.toISOString(),
+      captureIntervalSeconds: company?.captureIntervalSeconds ?? 900,
+      isCapturePaused: company?.isCapturePaused ?? false,
     };
   }
 

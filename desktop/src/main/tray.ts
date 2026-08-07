@@ -3,8 +3,6 @@ import path from 'path';
 import {
   captureDesktopNow,
   getEngineStatus,
-  pauseScreenshotEngine,
-  resumeScreenshotEngine,
 } from './screenshot.engine.js';
 
 let tray: Tray | null = null;
@@ -17,10 +15,22 @@ export function createSystemTray(mainWindow: BrowserWindow): Tray {
   tray.setToolTip('ScreenAdvait Enterprise Screenshot Platform');
 
   const updateMenu = () => {
-    const isPaused = getEngineStatus().isPaused;
+    const status = getEngineStatus();
+    const intervalLabel = status.intervalSeconds < 60
+      ? `${status.intervalSeconds} sec`
+      : `${Math.round(status.intervalSeconds / 60)} min`;
     const contextMenu = Menu.buildFromTemplate([
       {
         label: 'ScreenAdvait Platform',
+        enabled: false,
+      },
+      { type: 'separator' },
+      {
+        label: `Capture Interval: ${intervalLabel} (Managed by Admin)`,
+        enabled: false,
+      },
+      {
+        label: status.isPaused ? '⏸ Capture Paused by Admin' : '● Capture Active',
         enabled: false,
       },
       { type: 'separator' },
@@ -37,17 +47,6 @@ export function createSystemTray(mainWindow: BrowserWindow): Tray {
           await captureDesktopNow();
         },
       },
-      {
-        label: isPaused ? 'Resume Screenshot Engine' : 'Pause Screenshot Engine',
-        click: () => {
-          if (isPaused) {
-            resumeScreenshotEngine();
-          } else {
-            pauseScreenshotEngine();
-          }
-          updateMenu();
-        },
-      },
       { type: 'separator' },
       {
         label: 'Exit',
@@ -61,6 +60,8 @@ export function createSystemTray(mainWindow: BrowserWindow): Tray {
   };
 
   updateMenu();
+  // Refresh tray menu every 30 seconds to reflect admin changes
+  setInterval(updateMenu, 30_000);
 
   tray.on('double-click', () => {
     mainWindow.show();

@@ -127,4 +127,17 @@ export class CompanyAdminController {
   disconnectDriveConnection(@Req() req: any) {
     return this.companyAdmin.disconnectDriveConnection(req.user.companyId);
   }
+
+  @Get('capture-settings')
+  getCaptureSettings(@Req() req: any) {
+    return this.companyAdmin.getCaptureSettings(req.user.companyId);
+  }
+
+  @Post('capture-settings')
+  updateCaptureSettings(
+    @Body() body: { captureIntervalSeconds?: number; isCapturePaused?: boolean },
+    @Req() req: any,
+  ) {
+    return this.companyAdmin.updateCaptureSettings(req.user.companyId, body);
+  }
 }

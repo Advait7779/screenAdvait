@@ -127,7 +127,7 @@ if (!gotTheLock) {
         | undefined;
       if (app.isPackaged) {
         app.setLoginItemSettings({
-          openAtLogin: autoStart?.value !== 'false',
+          openAtLogin: true,
           args: ['--hidden'],
         });
       }
@@ -148,9 +148,7 @@ if (!gotTheLock) {
 
     try {
       const session = initializeSession();
-      const db = initSqliteDb();
-      const pauseSetting = db.prepare('SELECT value FROM local_settings WHERE key = ?').get('capturePaused') as { value: string } | undefined;
-      if (session && pauseSetting?.value !== 'true') {
+      if (session) {
         startScreenshotEngine();
       }
     } catch (err) {

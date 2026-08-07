@@ -168,9 +168,68 @@ export class CompanyService {
       subscriptions: company._count.subscriptions,
     };
 
-    // Delete the company — cascading deletes handle all child records
-    await this.prisma.company.delete({
-      where: { id: companyId },
+    // Delete all child records in dependency order inside a transaction
+    await this.prisma.$transaction(async (tx) => {
+      const companyUsers = await tx.user.findMany({
+        where: { companyId },
+        select: { id: true },
+      });
+      const userIds = companyUsers.map((u) => u.id);
+
+      // 1. Audit logs
+      await tx.auditLog.deleteMany({
+        where: {
+          OR: [
+            { companyId },
+            ...(userIds.length > 0 ? [{ userId: { in: userIds } }] : []),
+          ],
+        },
+      });
+
+      // 2. User settings & login logs
+      if (userIds.length > 0) {
+        await tx.loginLog.deleteMany({ where: { userId: { in: userIds } } });
+        await tx.setting.deleteMany({ where: { userId: { in: userIds } } });
+      }
+
+      // 3. Screenshots
+      await tx.screenshot.deleteMany({ where: { companyId } });
+
+      // 4. Devices & License histories
+      const companyLicenses = await tx.license.findMany({
+        where: { companyId },
+        select: { id: true },
+      });
+      const licenseIds = companyLicenses.map((l) => l.id);
+      if (licenseIds.length > 0) {
+        await tx.device.deleteMany({ where: { licenseId: { in: licenseIds } } });
+        await tx.licenseHistory.deleteMany({ where: { licenseId: { in: licenseIds } } });
+      }
+
+      // 5. Licenses & Subscriptions
+      await tx.license.deleteMany({ where: { companyId } });
+      await tx.subscription.deleteMany({ where: { companyId } });
+
+      // 6. Payments & Invoices
+      const companyInvoices = await tx.invoice.findMany({
+        where: { companyId },
+        select: { id: true },
+      });
+      const invoiceIds = companyInvoices.map((i) => i.id);
+      if (invoiceIds.length > 0) {
+        await tx.payment.deleteMany({ where: { invoiceId: { in: invoiceIds } } });
+      }
+      await tx.invoice.deleteMany({ where: { companyId } });
+
+      // 7. Reports & Drive Connection
+      await tx.report.deleteMany({ where: { companyId } });
+      await tx.googleDriveConnection.deleteMany({ where: { companyId } });
+
+      // 8. Users
+      await tx.user.deleteMany({ where: { companyId } });
+
+      // 9. Company
+      await tx.company.delete({ where: { id: companyId } });
     });
 
     // Clean up screenshot files from disk (non-blocking)

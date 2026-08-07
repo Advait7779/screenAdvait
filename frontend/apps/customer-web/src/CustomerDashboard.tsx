@@ -1335,12 +1335,9 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
                     </label>
                     <div className="grid grid-cols-3 gap-2.5">
                       {[
-                        { value: 60, label: '1 min' },
                         { value: 300, label: '5 min' },
-                        { value: 600, label: '10 min' },
                         { value: 900, label: '15 min' },
                         { value: 1800, label: '30 min' },
-                        { value: 3600, label: '60 min' },
                       ].map((opt) => {
                         const isSelected = selectedInterval === opt.value;
                         return (

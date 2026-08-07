@@ -46,6 +46,16 @@ export class CompanyAdminService {
               currentDevices: true,
               expiryDate: true,
               subscriptionId: true,
+              devices: {
+                select: {
+                  id: true,
+                  lastSeenAt: true,
+                  computerName: true,
+                  os: true,
+                },
+                orderBy: { lastSeenAt: 'desc' },
+                take: 1,
+              },
             },
             orderBy: { createdAt: 'desc' },
           },

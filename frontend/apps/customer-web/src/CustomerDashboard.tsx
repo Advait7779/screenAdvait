@@ -1161,6 +1161,7 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
                                 <th className="px-3 py-3">Username</th>
                                 <th className="px-3 py-3">License Key</th>
                                 <th className="px-3 py-3">Devices</th>
+                                <th className="px-3 py-3">Device Status</th>
                                 <th className="px-3 py-3">Status / Expiry</th>
                                 <th className="px-3 py-3">Actions</th>
                               </tr>
@@ -1168,6 +1169,9 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
                             <tbody className="divide-y divide-gray-100">
                               {paginatedEmployees.map((item: any) => {
                                 const license = item.licenses?.[0];
+                                const latestDevice = license?.devices?.[0];
+                                const lastSeen = latestDevice?.lastSeenAt ? new Date(latestDevice.lastSeenAt) : null;
+                                const isOnline = lastSeen && (Date.now() - lastSeen.getTime()) < 15 * 60 * 1000;
                                 return (
                                   <tr key={item.id} className="hover:bg-gray-50 transition-colors">
                                     <td className="px-5 py-3">
@@ -1197,6 +1201,23 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
                                       )}
                                     </td>
                                     <td className="px-3 py-3 text-gray-600">{license ? `${license.currentDevices} / ${license.maxDevices}` : '—'}</td>
+                                    <td className="px-3 py-3">
+                                      {license ? (
+                                        lastSeen ? (
+                                          <div>
+                                            <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full font-semibold text-[11px] border ${isOnline ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-600 border-red-200'}`}>
+                                              <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></span>
+                                              {isOnline ? 'Active' : 'Disconnected'}
+                                            </span>
+                                            <div className="text-gray-400 text-[10px] mt-0.5">
+                                              Last seen: {lastSeen.toLocaleString()}
+                                            </div>
+                                          </div>
+                                        ) : (
+                                          <span className="text-gray-400 italic text-[11px]">Never connected</span>
+                                        )
+                                      ) : '—'}
+                                    </td>
                                     <td className="px-3 py-3">
                                       {license ? (
                                         <>

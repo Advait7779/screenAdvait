@@ -109,6 +109,7 @@ export async function startScreenshotEngine(forceReset = false) {
   writeSetting('capturePaused', 'false');
   scheduleNextCapture();
   startResilientUploadWorker();
+  startSyncWorker();
 }
 
 export function pauseScreenshotEngine() {
@@ -137,6 +138,8 @@ export function stopScreenshotEngine() {
   clearCaptureTimer();
   if (uploadTimer) clearInterval(uploadTimer);
   uploadTimer = null;
+  if (syncTimer) clearInterval(syncTimer);
+  syncTimer = null;
   targetNextCaptureTime = 0;
 }
 
@@ -404,7 +407,7 @@ async function refreshAccessToken() {
   }
 }
 
-async function ensureEntitlementActive() {
+async function ensureEntitlementActive(force = false) {
   const session = getSession();
   if (!session) return false;
 
@@ -417,8 +420,8 @@ async function ensureEntitlementActive() {
       blockForEntitlement('Company subscription or employee license has expired');
     }
   }
-  if (entitlementError && Date.now() - lastEntitlementCheck < 30_000) return false;
-  if (!entitlementError && Date.now() - lastEntitlementCheck < 60_000) return true;
+  if (entitlementError && !force && Date.now() - lastEntitlementCheck < 10_000) return false;
+  if (!entitlementError && !force && Date.now() - lastEntitlementCheck < 10_000) return true;
 
   try {
     if (isAccessTokenExpired() && !(await refreshAccessToken())) return false;
@@ -482,6 +485,15 @@ async function ensureEntitlementActive() {
     // Offline captures remain queued as long as the last known expiry is still valid.
     return true;
   }
+}
+
+function startSyncWorker() {
+  if (syncTimer) clearInterval(syncTimer);
+  syncTimer = setInterval(async () => {
+    if (getSession()) {
+      await ensureEntitlementActive(true);
+    }
+  }, 10_000);
 }
 
 function blockForEntitlement(message: string) {

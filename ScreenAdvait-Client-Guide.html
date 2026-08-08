@@ -1,0 +1,1305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ScreenAdvait — Client Setup Guide</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --primary: #2563eb;
+      --primary-dark: #1e40af;
+      --accent: #06b6d4;
+      --green: #10b981;
+      --red: #ef4444;
+      --orange: #f59e0b;
+      --bg-dark: #0f172a;
+      --bg-slide: #ffffff;
+      --text-dark: #1e293b;
+      --text-light: #64748b;
+      --gradient-1: linear-gradient(135deg, #1e3a8a 0%, #2563eb 50%, #06b6d4 100%);
+      --gradient-2: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      --gradient-green: linear-gradient(135deg, #059669 0%, #10b981 100%);
+      --gradient-orange: linear-gradient(135deg, #d97706 0%, #f59e0b 100%);
+      --gradient-red: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #0f172a;
+      color: var(--text-dark);
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+    }
+
+    /* ─── Slide Container ─── */
+    .deck {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    .slide {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 60px 80px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.5s ease, transform 0.5s ease;
+      transform: translateX(60px);
+      overflow-y: auto;
+    }
+
+    .slide.active {
+      opacity: 1;
+      pointer-events: all;
+      transform: translateX(0);
+    }
+
+    /* ─── Title Slide ─── */
+    .slide-title {
+      background: var(--gradient-1);
+      color: #fff;
+      text-align: center;
+    }
+
+    .slide-title .logo {
+      font-size: 72px;
+      font-weight: 900;
+      letter-spacing: -2px;
+      margin-bottom: 12px;
+      text-shadow: 0 4px 30px rgba(0,0,0,0.3);
+    }
+
+    .slide-title .logo span {
+      color: #67e8f9;
+    }
+
+    .slide-title .subtitle {
+      font-size: 26px;
+      font-weight: 400;
+      opacity: 0.9;
+      margin-bottom: 40px;
+    }
+
+    .slide-title .tagline {
+      font-size: 16px;
+      font-weight: 300;
+      opacity: 0.7;
+      max-width: 600px;
+      line-height: 1.7;
+    }
+
+    /* ─── Content Slides ─── */
+    .slide-content {
+      background: var(--bg-slide);
+    }
+
+    .slide-dark {
+      background: var(--gradient-2);
+      color: #e2e8f0;
+    }
+
+    .slide-green {
+      background: var(--gradient-green);
+      color: #fff;
+    }
+
+    .slide-orange {
+      background: linear-gradient(135deg, #fef3c7 0%, #fde68a 30%, #fbbf24 100%);
+      color: #78350f;
+    }
+
+    .slide-red {
+      background: linear-gradient(135deg, #fef2f2 0%, #fecaca 50%, #fca5a5 100%);
+      color: #7f1d1d;
+    }
+
+    /* ─── Slide Header ─── */
+    .slide-header {
+      width: 100%;
+      max-width: 1000px;
+      margin-bottom: 40px;
+    }
+
+    .slide-header .step-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 16px;
+      border-radius: 100px;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      margin-bottom: 16px;
+    }
+
+    .slide-content .step-badge {
+      background: #dbeafe;
+      color: #1e40af;
+    }
+
+    .slide-dark .step-badge {
+      background: rgba(96, 165, 250, 0.2);
+      color: #93c5fd;
+    }
+
+    .slide-green .step-badge {
+      background: rgba(255,255,255,0.25);
+      color: #fff;
+    }
+
+    .slide-orange .step-badge {
+      background: rgba(120, 53, 15, 0.15);
+      color: #92400e;
+    }
+
+    .slide-red .step-badge {
+      background: rgba(127, 29, 29, 0.15);
+      color: #991b1b;
+    }
+
+    .slide-header h2 {
+      font-size: 38px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      line-height: 1.2;
+    }
+
+    .slide-content .slide-header h2 { color: var(--text-dark); }
+    .slide-dark .slide-header h2 { color: #f1f5f9; }
+
+    .slide-header p {
+      font-size: 17px;
+      margin-top: 10px;
+      line-height: 1.6;
+    }
+
+    .slide-content .slide-header p { color: var(--text-light); }
+    .slide-dark .slide-header p { color: #94a3b8; }
+
+    /* ─── Card Grid ─── */
+    .card-grid {
+      display: grid;
+      gap: 20px;
+      width: 100%;
+      max-width: 1000px;
+    }
+
+    .card-grid.cols-2 { grid-template-columns: 1fr 1fr; }
+    .card-grid.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+
+    .card {
+      padding: 28px 24px;
+      border-radius: 16px;
+      border: 1px solid #e2e8f0;
+      background: #fff;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .slide-dark .card {
+      background: rgba(255,255,255,0.06);
+      border-color: rgba(255,255,255,0.1);
+    }
+
+    .card .card-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      margin-bottom: 16px;
+    }
+
+    .card h3 {
+      font-size: 17px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .slide-content .card h3 { color: var(--text-dark); }
+    .slide-dark .card h3 { color: #f1f5f9; }
+
+    .card p, .card li {
+      font-size: 14px;
+      line-height: 1.7;
+    }
+
+    .slide-content .card p,
+    .slide-content .card li { color: var(--text-light); }
+    .slide-dark .card p,
+    .slide-dark .card li { color: #94a3b8; }
+
+    /* ─── Steps List ─── */
+    .steps-list {
+      width: 100%;
+      max-width: 1000px;
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .steps-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      padding: 20px 24px;
+      border-radius: 14px;
+      font-size: 15px;
+      line-height: 1.7;
+    }
+
+    .slide-content .steps-list li {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      color: var(--text-dark);
+    }
+
+    .slide-dark .steps-list li {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+      color: #cbd5e1;
+    }
+
+    .slide-orange .steps-list li {
+      background: rgba(255,255,255,0.5);
+      border: 1px solid rgba(120,53,15,0.15);
+      color: #78350f;
+    }
+
+    .slide-red .steps-list li {
+      background: rgba(255,255,255,0.6);
+      border: 1px solid rgba(127,29,29,0.12);
+      color: #7f1d1d;
+    }
+
+    .slide-green .steps-list li {
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.2);
+      color: #ecfdf5;
+    }
+
+    .step-num {
+      width: 32px;
+      height: 32px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 14px;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .slide-content .step-num {
+      background: var(--primary);
+      color: #fff;
+    }
+
+    .slide-dark .step-num {
+      background: #3b82f6;
+      color: #fff;
+    }
+
+    .slide-orange .step-num {
+      background: #92400e;
+      color: #fef3c7;
+    }
+
+    .slide-red .step-num {
+      background: #991b1b;
+      color: #fef2f2;
+    }
+
+    .slide-green .step-num {
+      background: rgba(255,255,255,0.25);
+      color: #fff;
+    }
+
+    .step-text strong {
+      display: block;
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .step-text span {
+      font-size: 13.5px;
+      opacity: 0.85;
+    }
+
+    /* ─── Highlight Box ─── */
+    .highlight-box {
+      width: 100%;
+      max-width: 1000px;
+      padding: 28px 32px;
+      border-radius: 16px;
+      margin-top: 24px;
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      font-size: 15px;
+      line-height: 1.7;
+    }
+
+    .highlight-box.info {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      color: #1e40af;
+    }
+
+    .highlight-box.warning {
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      color: #92400e;
+    }
+
+    .highlight-box.success {
+      background: #ecfdf5;
+      border: 1px solid #a7f3d0;
+      color: #065f46;
+    }
+
+    .highlight-box.danger {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: #991b1b;
+    }
+
+    .slide-dark .highlight-box.info {
+      background: rgba(59, 130, 246, 0.12);
+      border-color: rgba(59, 130, 246, 0.25);
+      color: #93c5fd;
+    }
+
+    .slide-dark .highlight-box.warning {
+      background: rgba(245, 158, 11, 0.12);
+      border-color: rgba(245, 158, 11, 0.25);
+      color: #fcd34d;
+    }
+
+    .highlight-box .hl-icon {
+      font-size: 22px;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    /* ─── Table ─── */
+    .info-table {
+      width: 100%;
+      max-width: 1000px;
+      border-collapse: collapse;
+      margin-top: 8px;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid #e2e8f0;
+    }
+
+    .slide-dark .info-table { border-color: rgba(255,255,255,0.1); }
+
+    .info-table th, .info-table td {
+      padding: 14px 20px;
+      text-align: left;
+      font-size: 14px;
+    }
+
+    .info-table th {
+      font-weight: 700;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .slide-content .info-table th {
+      background: #f1f5f9;
+      color: #475569;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .slide-content .info-table td {
+      border-bottom: 1px solid #f1f5f9;
+      color: var(--text-dark);
+    }
+
+    .slide-dark .info-table th {
+      background: rgba(255,255,255,0.06);
+      color: #94a3b8;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .slide-dark .info-table td {
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      color: #cbd5e1;
+    }
+
+    .status-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 6px;
+    }
+
+    .status-dot.green { background: #10b981; }
+    .status-dot.red { background: #ef4444; }
+    .status-dot.gray { background: #94a3b8; }
+
+    /* ─── Keyboard Shortcut ─── */
+    .kbd {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin: 16px 0;
+    }
+
+    .kbd-key {
+      display: inline-block;
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-family: 'Inter', monospace;
+      font-weight: 700;
+      font-size: 16px;
+      min-width: 44px;
+      text-align: center;
+    }
+
+    .slide-dark .kbd-key {
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
+      color: #e2e8f0;
+      box-shadow: 0 2px 0 rgba(255,255,255,0.1);
+    }
+
+    .kbd-plus {
+      font-weight: 600;
+      font-size: 18px;
+      opacity: 0.5;
+    }
+
+    /* ─── Navigation ─── */
+    .nav-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 64px;
+      background: rgba(15, 23, 42, 0.95);
+      backdrop-filter: blur(20px);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 32px;
+      z-index: 100;
+      border-top: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .nav-bar .slide-counter {
+      color: #64748b;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+
+    .nav-bar .slide-counter span {
+      color: #e2e8f0;
+    }
+
+    .nav-buttons {
+      display: flex;
+      gap: 10px;
+    }
+
+    .nav-btn {
+      padding: 10px 24px;
+      border-radius: 10px;
+      border: none;
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .nav-btn.prev {
+      background: rgba(255,255,255,0.08);
+      color: #94a3b8;
+    }
+
+    .nav-btn.prev:hover { background: rgba(255,255,255,0.12); color: #e2e8f0; }
+
+    .nav-btn.next {
+      background: #2563eb;
+      color: #fff;
+    }
+
+    .nav-btn.next:hover { background: #1d4ed8; }
+
+    .nav-btn:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+
+    /* ─── Progress Bar ─── */
+    .progress-bar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 3px;
+      background: var(--gradient-1);
+      transition: width 0.4s ease;
+      z-index: 101;
+    }
+
+    /* ─── Print / PDF ─── */
+    @media print {
+      .nav-bar, .progress-bar { display: none !important; }
+      .slide {
+        position: relative !important;
+        opacity: 1 !important;
+        pointer-events: all !important;
+        transform: none !important;
+        page-break-after: always;
+        height: 100vh;
+        min-height: 100vh;
+      }
+      body { overflow: visible; }
+      .deck { height: auto; }
+    }
+
+    /* ─── Large centered content ─── */
+    .big-center {
+      text-align: center;
+      max-width: 800px;
+    }
+
+    .big-center .emoji {
+      font-size: 64px;
+      margin-bottom: 24px;
+    }
+
+    .big-center h2 {
+      font-size: 42px;
+      font-weight: 800;
+      margin-bottom: 16px;
+    }
+
+    .big-center p {
+      font-size: 18px;
+      line-height: 1.7;
+      opacity: 0.85;
+    }
+
+    /* ─── Feature Row ─── */
+    .feature-row {
+      display: flex;
+      align-items: center;
+      gap: 32px;
+      width: 100%;
+      max-width: 1000px;
+    }
+
+    .feature-row .feature-visual {
+      flex: 0 0 280px;
+      height: 200px;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 72px;
+    }
+
+    .feature-row .feature-text {
+      flex: 1;
+    }
+
+    .feature-row .feature-text h3 {
+      font-size: 22px;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+
+    .feature-row .feature-text p {
+      font-size: 15px;
+      line-height: 1.7;
+    }
+
+    .url-box {
+      display: inline-block;
+      padding: 12px 24px;
+      border-radius: 12px;
+      font-family: 'Inter', monospace;
+      font-weight: 600;
+      font-size: 18px;
+      margin: 16px 0;
+      letter-spacing: 0.3px;
+    }
+
+    .slide-content .url-box {
+      background: #f1f5f9;
+      border: 1px solid #e2e8f0;
+      color: #1e40af;
+    }
+
+    .slide-dark .url-box {
+      background: rgba(59,130,246,0.12);
+      border: 1px solid rgba(59,130,246,0.25);
+      color: #60a5fa;
+    }
+  </style>
+</head>
+<body>
+
+<div class="progress-bar" id="progressBar"></div>
+
+<div class="deck" id="deck">
+
+  <!-- ══════════════ SLIDE 1: Title ══════════════ -->
+  <div class="slide slide-title active" data-index="0">
+    <div class="logo">Screen<span>Advait</span></div>
+    <div class="subtitle">Employee Desktop Monitoring Solution</div>
+    <div class="tagline">
+      Complete setup guide for your organization.<br />
+      Automatic, invisible desktop screenshots — fully managed from your web portal.
+    </div>
+  </div>
+
+  <!-- ══════════════ SLIDE 2: What is ScreenAdvait ══════════════ -->
+  <div class="slide slide-content" data-index="1">
+    <div class="slide-header">
+      <div class="step-badge">📌 Overview</div>
+      <h2>What is ScreenAdvait?</h2>
+      <p>A simple tool that automatically takes screenshots of your employees' computers and stores them securely for you to review anytime.</p>
+    </div>
+    <div class="card-grid cols-3">
+      <div class="card">
+        <div class="card-icon" style="background: #dbeafe; color: #2563eb;">🖥️</div>
+        <h3>Desktop App</h3>
+        <p>A small app installed on each employee's computer. It runs silently in the background — employees won't see it.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon" style="background: #fce7f3; color: #db2777;">📸</div>
+        <h3>Auto Screenshots</h3>
+        <p>The app automatically captures the employee's screen at intervals you choose (every 5, 15, or 30 minutes).</p>
+      </div>
+      <div class="card">
+        <div class="card-icon" style="background: #d1fae5; color: #059669;">🌐</div>
+        <h3>Web Portal</h3>
+        <p>View all captured screenshots from anywhere using your secure web dashboard. No software needed — just a browser.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════ SLIDE 3: How It Works ══════════════ -->
+  <div class="slide slide-dark" data-index="2">
+    <div class="slide-header">
+      <div class="step-badge">🔄 How It Works</div>
+      <h2>Simple 4-Step Process</h2>
+      <p>Getting started takes just a few minutes.</p>
+    </div>
+    <div class="card-grid cols-2">
+      <div class="card">
+        <div class="card-icon" style="background: rgba(96,165,250,0.15); color: #60a5fa;">1️⃣</div>
+        <h3>Login to Web Portal</h3>
+        <p>Open your browser and go to the ScreenAdvait portal. Login with your company admin credentials.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon" style="background: rgba(52,211,153,0.15); color: #34d399;">2️⃣</div>
+        <h3>Add Employees</h3>
+        <p>Create employees in the portal. Each employee gets a unique username, password, and license key.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon" style="background: rgba(251,191,36,0.15); color: #fbbf24;">3️⃣</div>
+        <h3>Install Desktop App</h3>
+        <p>Download the app from the portal and install it on each employee's computer. Login once with their credentials.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon" style="background: rgba(244,114,182,0.15); color: #f472b6;">4️⃣</div>
+        <h3>Monitor & Review</h3>
+        <p>Screenshots start appearing on your portal automatically. Review them anytime, from anywhere.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════ SLIDE 4: Step 1 — Login ══════════════ -->
+  <div class="slide slide-content" data-index="3">
+    <div class="slide-header">
+      <div class="step-badge">Step 1</div>
+      <h2>Login to Your Web Portal</h2>
+      <p>Access your company's monitoring dashboard from any browser.</p>
+    </div>
+    <ul class="steps-list">
+      <li>
+        <div class="step-num">1</div>
+        <div class="step-text">
+          <strong>Open the Portal Link</strong>
+          <span>Open your web browser (Chrome, Edge, Firefox) and go to:</span>
+        </div>
+      </li>
+    </ul>
+    <div style="text-align: center; margin: 16px 0;">
+      <div class="url-box">https://screen.advaitdigital.co.in</div>
+    </div>
+    <ul class="steps-list">
+      <li>
+        <div class="step-num">2</div>
+        <div class="step-text">
+          <strong>Enter Your Login Credentials</strong>
+          <span>Type in your <strong>Company Admin Username</strong> and <strong>Password</strong> (provided by ScreenAdvait team).</span>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">3</div>
+        <div class="step-text">
+          <strong>Click "Sign In"</strong>
+          <span>You will see your company dashboard with all monitoring features.</span>
+        </div>
+      </li>
+    </ul>
+  </div>
+
+  <!-- ══════════════ SLIDE 5: Step 2 — Create Employees ══════════════ -->
+  <div class="slide slide-dark" data-index="4">
+    <div class="slide-header">
+      <div class="step-badge">Step 2</div>
+      <h2>Create Employees</h2>
+      <p>Add your team members who will be monitored.</p>
+    </div>
+    <ul class="steps-list">
+      <li>
+        <div class="step-num">1</div>
+        <div class="step-text">
+          <strong>Go to "Employees & Keys" tab</strong>
+          <span>Click the "Employees & Keys" tab on the left sidebar of your dashboard.</span>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">2</div>
+        <div class="step-text">
+          <strong>Click "+ New Employee"</strong>
+          <span>Fill in the employee's <strong>Full Name</strong>, <strong>Email</strong>, <strong>Username</strong>, and set a <strong>Password</strong> (minimum 6 characters).</span>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">3</div>
+        <div class="step-text">
+          <strong>Click "Create"</strong>
+          <span>The employee will be added to your list. Repeat for each team member.</span>
+        </div>
+      </li>
+    </ul>
+    <div class="highlight-box info">
+      <div class="hl-icon">💡</div>
+      <div><strong>Tip:</strong> Keep the username and password handy — you'll need them to login on the employee's computer.</div>
+    </div>
+  </div>
+
+  <!-- ══════════════ SLIDE 6: Step 3 — Generate License Key ══════════════ -->
+  <div class="slide slide-content" data-index="5">
+    <div class="slide-header">
+      <div class="step-badge">Step 3</div>
+      <h2>Generate License Keys</h2>
+      <p>Each employee needs a unique license key to activate the desktop app.</p>
+    </div>
+    <ul class="steps-list">
+      <li>
+        <div class="step-num">1</div>
+        <div class="step-text">
+          <strong>Find the Employee in the Table</strong>
+          <span>In the "Employees & Keys" tab, locate the employee you just created.</span>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">2</div>
+        <div class="step-text">
+          <strong>Click "Generate Key"</strong>
+          <span>A unique license key (like <code style="background:#f1f5f9;padding:2px 8px;border-radius:6px;font-weight:600;">ATS-XXXX-XXXX-XXXX-XXXX</code>) will be created.</span>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">3</div>
+        <div class="step-text">
+          <strong>Copy the License Key</strong>
+          <span>Click on the key to copy it. You'll need this key when setting up the desktop app on the employee's computer.</span>
+        </div>
+      </li>
+    </ul>
+    <div class="highlight-box warning">
+      <div class="hl-icon">⚠️</div>
+      <div><strong>Important:</strong> Each license key works on only <strong>1 device</strong>. You need a separate key for each employee.</div>
+    </div>
+  </div>
+
+  <!-- ══════════════ SLIDE 7: Step 4 — Download Desktop App ══════════════ -->
+  <div class="slide slide-dark" data-index="6">
+    <div class="slide-header">
+      <div class="step-badge">Step 4</div>
+      <h2>Download the Desktop App</h2>
+      <p>Download the installer from your web portal.</p>
+    </div>
+    <ul class="steps-list">
+      <li>
+        <div class="step-num">1</div>
+        <div class="step-text">
+          <strong>Click "Download Desktop App"</strong>
+          <span>On the login page of the portal, you'll see a download button. Click it to download the installer file.</span>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">2</div>
+        <div class="step-text">
+          <strong>Save the File</strong>
+          <span>The file <code style="background:rgba(255,255,255,0.1);padding:2px 8px;border-radius:6px;">ScreenAdvait-Enterprise-Desktop-Setup.exe</code> will be saved to your Downloads folder.</span>
+        </div>
+      </li>
+    </ul>
+    <div class="highlight-box warning">
+      <div class="hl-icon">🛡️</div>
+      <div><strong>Windows Defender / Antivirus Warning:</strong> Your browser or Windows may show a security warning. This is normal for new enterprise software. See the next slides for how to allow the app safely.</div>
+    </div>
+  </div>
+
+  <!-- ══════════════ SLIDE 8: Defender — Chrome Block ══════════════ -->
+  <div class="slide slide-orange" data-index="7">
+    <div class="slide-header">
+      <div class="step-badge">⚠️ Security — Chrome</div>
+      <h2>If Chrome Blocks the Download</h2>
+      <p>Chrome may show "Virus detected" or "Failed — Blocked" message. This is a false alarm.</p>
+    </div>
+    <ul class="steps-list">
+      <li>
+        <div class="step-num">1</div>
+        <div class="step-text">
+          <strong>Open Chrome Downloads Page</strong>
+          <span>Press <strong>Ctrl + J</strong> or type <strong>chrome://downloads</strong> in the address bar.</span>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">2</div>
+        <div class="step-text">
+          <strong>Find the Blocked File</strong>
+          <span>Look for "ScreenAdvait-Enterprise-Desktop-Setup" with a "Blocked" or "Virus detected" label.</span>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">3</div>
+        <div class="step-text">
+          <strong>Click "Keep" or "Keep dangerous file"</strong>
+          <span>Click the option to keep the file. If prompted again, confirm by clicking "Keep anyway".</span>
+        </div>
+      </li>
+    </ul>
+    <div class="highlight-box warning">
+      <div class="hl-icon">ℹ️</div>
+      <div><strong>Why does this happen?</strong> The app captures screenshots (which looks similar to monitoring software). Chrome is cautious with new apps it hasn't seen before. The app is 100% safe.</div>
+    </div>
+  </div>
+
+  <!-- ══════════════ SLIDE 9: Defender — Windows Block ══════════════ -->
+  <div class="slide slide-red" data-index="8">
+    <div class="slide-header">
+      <div class="step-badge">🛡️ Security — Windows Defender</div>
+      <h2>If Windows Blocks the Installer</h2>
+      <p>You may see: "Operation did not complete because the file contains a virus." This is a false alarm.</p>
+    </div>
+    <ul class="steps-list">
+      <li>
+        <div class="step-num">1</div>
+        <div class="step-text">
+          <strong>Open Windows Security</strong>
+          <span>Press the <strong>Windows key</strong>, type <strong>"Windows Security"</strong>, and open it.</span>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">2</div>
+        <div class="step-text">
+          <strong>Go to Protection History</strong>
+          <span>Click <strong>"Virus & threat protection"</strong> → then click <strong>"Protection history"</strong>.</span>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">3</div>
+        <div class="step-text">
+          <strong>Find & Allow the File</strong>
+          <span>Find the entry for "ScreenAdvait-Enterprise-Desktop-Setup.exe". Click on it → click <strong>"Actions"</strong> → select <strong>"Allow on device"</strong>.</span>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">4</div>
+        <div class="step-text">
+          <strong>Run the Installer Again</strong>
+          <span>Double-click the installer file again. It will now install successfully without any warnings.</span>
+        </div>
+      </li>
+    </ul>
+  </div>
+
+  <!-- ══════════════ SLIDE 10: Defender — Add Exclusion ══════════════ -->
+  <div class="slide slide-content" data-index="9">
+    <div class="slide-header">
+      <div class="step-badge">🛡️ Alternative Method</div>
+      <h2>Add Exclusion Before Installing</h2>
+      <p>If the above steps don't work, you can add an exclusion first.</p>
+    </div>
+    <ul class="steps-list">
+      <li>
+        <div class="step-num">1</div>
+        <div class="step-text">
+          <strong>Open Windows Security</strong>
+          <span>Press the Windows key → type <strong>"Windows Security"</strong> → open it.</span>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">2</div>
+        <div class="step-text">
+          <strong>Go to Exclusions</strong>
+          <span>Click <strong>"Virus & threat protection"</strong> → scroll down → click <strong>"Manage settings"</strong> → scroll to <strong>"Exclusions"</strong> → click <strong>"Add or remove exclusions"</strong>.</span>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">3</div>
+        <div class="step-text">
+          <strong>Add the Installer File</strong>
+          <span>Click <strong>"+ Add an exclusion"</strong> → choose <strong>"File"</strong> → find and select the <code>ScreenAdvait-Enterprise-Desktop-Setup.exe</code> file.</span>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">4</div>
+        <div class="step-text">
+          <strong>Run the Installer</strong>
+          <span>Now double-click the installer. It will run without being blocked.</span>
+        </div>
+      </li>
+    </ul>
+    <div class="highlight-box success">
+      <div class="hl-icon">✅</div>
+      <div><strong>This is a one-time step.</strong> Once the app is installed, it runs without any further issues.</div>
+    </div>
+  </div>
+
+  <!-- ══════════════ SLIDE 11: Step 5 — Install & Login ══════════════ -->
+  <div class="slide slide-dark" data-index="10">
+    <div class="slide-header">
+      <div class="step-badge">Step 5</div>
+      <h2>Install & Login on Employee's PC</h2>
+      <p>Setup takes less than 2 minutes per computer.</p>
+    </div>
+    <ul class="steps-list">
+      <li>
+        <div class="step-num">1</div>
+        <div class="step-text">
+          <strong>Run the Installer</strong>
+          <span>Double-click <strong>ScreenAdvait-Enterprise-Desktop-Setup.exe</strong>. Follow the installation steps (Next → Install → Finish).</span>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">2</div>
+        <div class="step-text">
+          <strong>App Opens Automatically</strong>
+          <span>After installation, the ScreenAdvait app will open showing a login screen.</span>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">3</div>
+        <div class="step-text">
+          <strong>Enter Employee Credentials</strong>
+          <span>Type in the employee's <strong>Username</strong>, <strong>Password</strong>, and <strong>License Key</strong> that you created in the portal.</span>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">4</div>
+        <div class="step-text">
+          <strong>Click "Login"</strong>
+          <span>The app will connect to the server and start capturing screenshots automatically.</span>
+        </div>
+      </li>
+    </ul>
+  </div>
+
+  <!-- ══════════════ SLIDE 12: Stealth Mode ══════════════ -->
+  <div class="slide slide-dark" data-index="11">
+    <div class="slide-header">
+      <div class="step-badge">🕵️ Stealth Mode</div>
+      <h2>The App Becomes Invisible</h2>
+      <p>After the first login, the app goes fully hidden.</p>
+    </div>
+    <div class="card-grid cols-2">
+      <div class="card">
+        <div class="card-icon" style="background: rgba(239,68,68,0.15); color: #f87171;">🚫</div>
+        <h3>What Employees Will NOT See</h3>
+        <p>
+          ✖ No icon on the Desktop<br />
+          ✖ No icon on the Windows Taskbar<br />
+          ✖ No icon near the clock (System Tray)<br />
+          ✖ No popup or notification<br />
+          ✖ No app window visible
+        </p>
+      </div>
+      <div class="card">
+        <div class="card-icon" style="background: rgba(16,185,129,0.15); color: #34d399;">✅</div>
+        <h3>What the App WILL Do</h3>
+        <p>
+          ✔ Run silently in the background<br />
+          ✔ Start automatically when PC turns on<br />
+          ✔ Capture screenshots at your set interval<br />
+          ✔ Upload screenshots to the cloud<br />
+          ✔ Send heartbeat to show "Active" status
+        </p>
+      </div>
+    </div>
+    <div class="highlight-box info" style="margin-top: 28px;">
+      <div class="hl-icon">🔑</div>
+      <div>
+        <strong>Secret Shortcut (Admin Only):</strong> If you ever need to open the app window on any employee's computer, press:
+        <div class="kbd" style="margin-top:10px;">
+          <span class="kbd-key">Ctrl</span>
+          <span class="kbd-plus">+</span>
+          <span class="kbd-key">Shift</span>
+          <span class="kbd-plus">+</span>
+          <span class="kbd-key">Alt</span>
+          <span class="kbd-plus">+</span>
+          <span class="kbd-key">S</span>
+        </div>
+        <div style="margin-top:6px; opacity:0.7; font-size:13px;">This keyboard shortcut works on any PC where the app is installed. Keep this confidential.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════ SLIDE 13: Viewing Screenshots ══════════════ -->
+  <div class="slide slide-content" data-index="12">
+    <div class="slide-header">
+      <div class="step-badge">Step 6</div>
+      <h2>View Screenshots on Your Portal</h2>
+      <p>All captured screenshots appear on your web dashboard in real-time.</p>
+    </div>
+    <ul class="steps-list">
+      <li>
+        <div class="step-num">1</div>
+        <div class="step-text">
+          <strong>Login to Your Portal</strong>
+          <span>Go to <strong>screen.advaitdigital.co.in</strong> and sign in with your admin credentials.</span>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">2</div>
+        <div class="step-text">
+          <strong>Go to "Desktop Captures" Tab</strong>
+          <span>This shows the latest screenshots from all employees, organized by date and employee name.</span>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">3</div>
+        <div class="step-text">
+          <strong>Click on Any Screenshot</strong>
+          <span>Click to view full-size. You can see exactly what was on the employee's screen at that time.</span>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">4</div>
+        <div class="step-text">
+          <strong>Use "All Screenshots" Tab for Search</strong>
+          <span>For advanced browsing with custom pagination and date-wise search.</span>
+        </div>
+      </li>
+    </ul>
+  </div>
+
+  <!-- ══════════════ SLIDE 14: Capture Settings ══════════════ -->
+  <div class="slide slide-dark" data-index="13">
+    <div class="slide-header">
+      <div class="step-badge">Step 7</div>
+      <h2>Manage Capture Settings</h2>
+      <p>Control how often screenshots are taken and pause/resume monitoring.</p>
+    </div>
+    <ul class="steps-list">
+      <li>
+        <div class="step-num">1</div>
+        <div class="step-text">
+          <strong>Go to "Capture Settings" Tab</strong>
+          <span>In the portal sidebar, click <strong>"Capture Settings"</strong>.</span>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">2</div>
+        <div class="step-text">
+          <strong>Choose Capture Interval</strong>
+          <span>Select how often screenshots should be taken: <strong>Every 5 minutes</strong>, <strong>Every 15 minutes</strong>, or <strong>Every 30 minutes</strong>.</span>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">3</div>
+        <div class="step-text">
+          <strong>Pause / Resume Monitoring</strong>
+          <span>Use the <strong>Pause</strong> button to temporarily stop all screenshots. Click <strong>Resume</strong> to start again. Changes take effect within 10 seconds on all employee computers.</span>
+        </div>
+      </li>
+    </ul>
+    <div class="highlight-box info">
+      <div class="hl-icon">⚡</div>
+      <div><strong>Instant Sync:</strong> Any setting change you make on the portal is applied to all employee PCs within <strong>10 seconds</strong> — no restart needed.</div>
+    </div>
+  </div>
+
+  <!-- ══════════════ SLIDE 15: Device Status ══════════════ -->
+  <div class="slide slide-content" data-index="14">
+    <div class="slide-header">
+      <div class="step-badge">📊 Monitoring</div>
+      <h2>Device Status Indicators</h2>
+      <p>Track which employees are actively being monitored.</p>
+    </div>
+    <table class="info-table">
+      <thead>
+        <tr>
+          <th>Status</th>
+          <th>What It Means</th>
+          <th>What You Should Do</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="status-dot green"></span> <strong>Active</strong></td>
+          <td>The employee's computer is online and the app is running. Screenshots are being captured normally.</td>
+          <td>Nothing — everything is working fine. ✅</td>
+        </tr>
+        <tr>
+          <td><span class="status-dot red"></span> <strong>Disconnected</strong></td>
+          <td>The employee's computer has been offline for more than 15 minutes. The app may be stopped, PC is shut down, or no internet.</td>
+          <td>Check if the employee's PC is turned on and connected to the internet. If the app was deleted, reinstall it.</td>
+        </tr>
+        <tr>
+          <td><span class="status-dot gray"></span> <strong>Never Connected</strong></td>
+          <td>The employee was created in the portal but the desktop app has never been installed or logged in on their computer.</td>
+          <td>Install the desktop app on the employee's computer and login with their credentials.</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="highlight-box danger" style="margin-top: 24px;">
+      <div class="hl-icon">🚨</div>
+      <div><strong>If an employee deletes the app:</strong> Their status will change to <strong>🔴 Disconnected</strong> after 15 minutes. You will see this on your portal and can take action (reinstall the app on their PC).</div>
+    </div>
+  </div>
+
+  <!-- ══════════════ SLIDE 16: Quick Reference ══════════════ -->
+  <div class="slide slide-dark" data-index="15">
+    <div class="slide-header">
+      <div class="step-badge">📋 Quick Reference</div>
+      <h2>Important Information</h2>
+      <p>Keep this handy for your team.</p>
+    </div>
+    <table class="info-table">
+      <thead>
+        <tr>
+          <th>Item</th>
+          <th>Details</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Web Portal URL</strong></td>
+          <td>https://screen.advaitdigital.co.in</td>
+        </tr>
+        <tr>
+          <td><strong>Capture Intervals</strong></td>
+          <td>5 minutes / 15 minutes / 30 minutes</td>
+        </tr>
+        <tr>
+          <td><strong>Secret Shortcut Key</strong></td>
+          <td><strong>Ctrl + Shift + Alt + S</strong> (opens the hidden app window)</td>
+        </tr>
+        <tr>
+          <td><strong>Auto-Start</strong></td>
+          <td>Yes — app starts automatically when the PC boots up</td>
+        </tr>
+        <tr>
+          <td><strong>Visible to Employee?</strong></td>
+          <td>No — the app is completely invisible after first login</td>
+        </tr>
+        <tr>
+          <td><strong>Settings Sync Speed</strong></td>
+          <td>Within 10 seconds on all devices</td>
+        </tr>
+        <tr>
+          <td><strong>Disconnect Alert</strong></td>
+          <td>If no heartbeat for 15 minutes → shows "Disconnected" in portal</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ══════════════ SLIDE 17: Thank You ══════════════ -->
+  <div class="slide slide-title" data-index="16">
+    <div class="big-center">
+      <div class="emoji">🚀</div>
+      <h2 style="color:#fff;">You're All Set!</h2>
+      <p style="color:rgba(255,255,255,0.85); font-size: 20px; max-width: 650px; margin: 0 auto;">
+        ScreenAdvait is now monitoring your team's desktops.<br />
+        Login to your portal anytime to review screenshots and manage settings.
+      </p>
+      <div style="margin-top: 40px; padding: 20px 32px; background: rgba(255,255,255,0.1); border-radius: 14px; display: inline-block;">
+        <div style="font-size: 14px; opacity: 0.7; margin-bottom: 6px;">Need Help? Contact Us</div>
+        <div style="font-size: 20px; font-weight: 700;">support@advaitdigital.co.in</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ─── Navigation Bar ─── -->
+<div class="nav-bar">
+  <div class="slide-counter">
+    Slide <span id="currentSlide">1</span> / <span id="totalSlides">17</span>
+  </div>
+  <div class="nav-buttons">
+    <button class="nav-btn prev" id="prevBtn" onclick="navigate(-1)">← Previous</button>
+    <button class="nav-btn next" id="nextBtn" onclick="navigate(1)">Next →</button>
+  </div>
+</div>
+
+<script>
+  let current = 0;
+  const slides = document.querySelectorAll('.slide');
+  const total = slides.length;
+  document.getElementById('totalSlides').textContent = total;
+
+  function showSlide(index) {
+    slides.forEach((s, i) => {
+      s.classList.toggle('active', i === index);
+    });
+    current = index;
+    document.getElementById('currentSlide').textContent = index + 1;
+    document.getElementById('prevBtn').disabled = index === 0;
+    document.getElementById('nextBtn').disabled = index === total - 1;
+    document.getElementById('nextBtn').textContent = index === total - 1 ? 'Finish ✓' : 'Next →';
+    document.getElementById('progressBar').style.width = ((index + 1) / total * 100) + '%';
+  }
+
+  function navigate(dir) {
+    const next = current + dir;
+    if (next >= 0 && next < total) showSlide(next);
+  }
+
+  // Keyboard navigation
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); navigate(1); }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); navigate(-1); }
+  });
+
+  showSlide(0);
+</script>
+
+</body>
+</html>

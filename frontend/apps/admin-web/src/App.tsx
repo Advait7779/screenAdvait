@@ -21,6 +21,7 @@ import {
   Trash2,
   Eye,
   EyeOff,
+  Pencil,
 } from 'lucide-react';
 import axios from 'axios';
 import { CustomerDashboard } from './CustomerDashboard';
@@ -208,6 +209,17 @@ export function App() {
   // Delete Company State
   const [deleteTargetCompany, setDeleteTargetCompany] = useState<any>(null);
 
+  // Edit Company & Subscription State
+  const [editTargetCompany, setEditTargetCompany] = useState<any>(null);
+  const [editForm, setEditForm] = useState({
+    companyName: '',
+    plan: 'MONTHLY',
+    maxEmployees: 25,
+    maxDevices: 25,
+    endDate: '',
+  });
+  const [editLoading, setEditLoading] = useState(false);
+
   // Subscriptions Table Pagination
   const [subPageSize, setSubPageSize] = useState<number>(10);
   const [subPage, setSubPage] = useState<number>(1);
@@ -307,39 +319,47 @@ export function App() {
     }
     const maxUsersNum = Math.max(1, Number(form.maxEmployees) || 25);
     const maxDevicesNum = Math.max(1, Number(form.maxDevices) || 25);
-    try {
-      let company = companies.find(
-        (item) => item.name.trim().toLowerCase() === trimmedName.toLowerCase(),
-      );
-      if (!company) {
-        const baseCode = trimmedName
-          .toUpperCase()
-          .replace(/[^A-Z0-9]/g, '')
-          .slice(0, 10) || 'COMPANY';
-        const sanitizedCode = baseCode;
-        const desiredUsername = form.adminUsername.trim() || baseCode.toLowerCase();
 
-        const newCompRes = await axios.post(
-          `${API_URL}/companies`,
-          {
-            name: trimmedName,
-            code: sanitizedCode,
-            contactEmail: `admin+${sanitizedCode.toLowerCase()}@screenadvait.example`,
-            maxUsers: maxUsersNum,
-            adminUsername: desiredUsername,
-            adminPassword: form.adminPassword.trim() || undefined,
-          },
-          auth(token),
-        );
-        company = newCompRes.data;
-        if (company.adminCredentials) {
-          setNewCompanyCredentials({
-            companyName: company.name,
-            username: company.adminCredentials.username,
-            temporaryPassword: company.adminCredentials.temporaryPassword,
-          });
-        }
+    // Block overwriting existing companies from onboarding form
+    const existingCompany = companies.find(
+      (item) => item.name.trim().toLowerCase() === trimmedName.toLowerCase(),
+    );
+    if (existingCompany) {
+      const errorMsg = `Company "${existingCompany.name}" already exists! To update its subscription or limits, click the Edit button in the table below.`;
+      setError(errorMsg);
+      addToast(`Company "${existingCompany.name}" already exists! Click the Edit button in the table below to modify its subscription.`, 'error');
+      return;
+    }
+
+    try {
+      const baseCode = trimmedName
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, '')
+        .slice(0, 10) || 'COMPANY';
+      const sanitizedCode = baseCode;
+      const desiredUsername = form.adminUsername.trim() || baseCode.toLowerCase();
+
+      const newCompRes = await axios.post(
+        `${API_URL}/companies`,
+        {
+          name: trimmedName,
+          code: sanitizedCode,
+          contactEmail: `admin+${sanitizedCode.toLowerCase()}@screenadvait.example`,
+          maxUsers: maxUsersNum,
+          adminUsername: desiredUsername,
+          adminPassword: form.adminPassword.trim() || undefined,
+        },
+        auth(token),
+      );
+      const company = newCompRes.data;
+      if (company.adminCredentials) {
+        setNewCompanyCredentials({
+          companyName: company.name,
+          username: company.adminCredentials.username,
+          temporaryPassword: company.adminCredentials.temporaryPassword,
+        });
       }
+
       await axios.post(
         `${API_URL}/subscriptions`,
         {
@@ -354,11 +374,50 @@ export function App() {
       const successMessage = `Company "${company.name}" onboarded & subscription assigned under ${form.plan} plan!`;
       setMsg(successMessage);
       addToast(successMessage, 'success');
+      setForm((prev) => ({ ...prev, companyName: '', adminUsername: '', adminPassword: '' }));
       await fetchAdminData();
     } catch (err: any) {
       const message = apiErrorMessage(err, 'Could not save company subscription');
       setError(message);
       addToast(message, 'error');
+    }
+  };
+
+  const openEditModal = (subItem: any) => {
+    setEditTargetCompany(subItem);
+    setEditForm({
+      companyName: subItem.company?.name || '',
+      plan: subItem.plan || 'MONTHLY',
+      maxEmployees: subItem.maxEmployees || 25,
+      maxDevices: subItem.maxDevices || 25,
+      endDate: subItem.endDate ? new Date(subItem.endDate).toISOString().split('T')[0] : '',
+    });
+  };
+
+  const handleUpdateCompanySubscription = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editTargetCompany) return;
+    setEditLoading(true);
+    try {
+      await axios.post(
+        `${API_URL}/subscriptions`,
+        {
+          companyId: editTargetCompany.companyId,
+          companyName: editForm.companyName.trim(),
+          plan: editForm.plan,
+          maxEmployees: Number(editForm.maxEmployees),
+          maxDevices: Number(editForm.maxDevices),
+          endDate: editForm.endDate ? new Date(editForm.endDate).toISOString() : undefined,
+        },
+        auth(token),
+      );
+      addToast(`Company "${editForm.companyName}" subscription updated successfully!`, 'success');
+      setEditTargetCompany(null);
+      await fetchAdminData();
+    } catch (err: any) {
+      addToast(apiErrorMessage(err, 'Failed to update company subscription'), 'error');
+    } finally {
+      setEditLoading(false);
     }
   };
 
@@ -1059,6 +1118,14 @@ export function App() {
                                 </td>
                                 <td className="px-3 py-3 space-x-2 whitespace-nowrap">
                                   <button
+                                    onClick={() => openEditModal(item)}
+                                    className="px-2.5 py-1 border border-blue-200 rounded-md text-blue-700 hover:bg-blue-50 text-[11px] font-medium transition-colors"
+                                    title="Edit Company Record"
+                                  >
+                                    <Pencil className="inline w-3 h-3 mr-1" />
+                                    Edit
+                                  </button>
+                                  <button
                                     onClick={() => {
                                       setResetPasswordTargetCompany(item.company);
                                       setResetPasswordResult(null);
@@ -1375,6 +1442,115 @@ export function App() {
                 </div>
               </form>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Edit Company & Subscription Modal */}
+      {editTargetCompany && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 modal-pop-in" role="dialog">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden border border-gray-100">
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between" style={{ background: '#f8fafc' }}>
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0">
+                  <Pencil className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-gray-900">Edit Company Record</h3>
+                  <p className="text-[11px] text-gray-500">Update company name, limits & plan</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditTargetCompany(null)}
+                className="text-gray-400 hover:text-gray-600 font-bold text-lg w-7 h-7 flex items-center justify-center rounded-md hover:bg-gray-200/50"
+              >
+                ×
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateCompanySubscription} className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Company Name</label>
+                <input
+                  type="text"
+                  required
+                  value={editForm.companyName}
+                  onChange={(e) => setEditForm({ ...editForm, companyName: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-md text-xs font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Employee Limit</label>
+                  <input
+                    type="number"
+                    min={editTargetCompany.usage?.employees || 1}
+                    max={10000}
+                    required
+                    value={editForm.maxEmployees}
+                    onChange={(e) => setEditForm({ ...editForm, maxEmployees: Number(e.target.value) })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-md text-xs font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  />
+                  <p className="text-[10px] text-gray-400 mt-1">Active: {editTargetCompany.usage?.employees || 0}</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Device Slots</label>
+                  <input
+                    type="number"
+                    min={editTargetCompany.usage?.allocatedDeviceSlots || 1}
+                    max={50000}
+                    required
+                    value={editForm.maxDevices}
+                    onChange={(e) => setEditForm({ ...editForm, maxDevices: Number(e.target.value) })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-md text-xs font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  />
+                  <p className="text-[10px] text-gray-400 mt-1">Allocated: {editTargetCompany.usage?.allocatedDeviceSlots || 0}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Subscription Plan</label>
+                  <select
+                    value={editForm.plan}
+                    onChange={(e) => setEditForm({ ...editForm, plan: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-md text-xs font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white"
+                  >
+                    {['MONTHLY', 'QUARTERLY', 'HALF_YEARLY', 'ONE_YEAR', 'LIFETIME'].map((p) => (
+                      <option key={p} value={p}>{p.replace('_', ' ')}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Expiry Date</label>
+                  <input
+                    type="date"
+                    value={editForm.endDate}
+                    onChange={(e) => setEditForm({ ...editForm, endDate: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-md text-xs font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-gray-100 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEditTargetCompany(null)}
+                  className="px-4 py-2 border border-gray-200 rounded-md text-xs font-semibold text-gray-600 hover:bg-gray-100 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={editLoading}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-xs font-semibold shadow-sm transition-all disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {editLoading ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

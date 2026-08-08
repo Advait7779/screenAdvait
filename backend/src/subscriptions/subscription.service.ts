@@ -48,10 +48,12 @@ export class SubscriptionService {
       current?.maxStorageMb ?? company.maxStorageMb ?? BigInt(51200),
     );
     const startDate = new Date();
-    // Editing quotas or plan labels must not silently grant a fresh term.
-    // Renewal is a separate, audited action.
-    const endDate = current?.endDate
-      ?? this.expiryForPlan(startDate, input.plan, input.customExpiryDays);
+    const customEndDate = (input as any).endDate;
+    const customCompanyName = (input as any).companyName;
+    // Editing quotas or plan labels must not silently grant a fresh term unless an explicit endDate is passed in edit modal.
+    const endDate = customEndDate
+      ? new Date(customEndDate)
+      : (current?.endDate ?? this.expiryForPlan(startDate, input.plan, input.customExpiryDays));
 
     const subscription = await this.prisma.$transaction(async (tx) => {
       const saved = current
@@ -61,7 +63,7 @@ export class SubscriptionService {
               plan: input.plan,
               status:
                 current.status === SubscriptionStatus.ACTIVE &&
-                current.endDate.getTime() <= Date.now()
+                endDate.getTime() <= Date.now()
                   ? SubscriptionStatus.EXPIRED
                   : current.status,
               endDate,
@@ -88,6 +90,7 @@ export class SubscriptionService {
       await tx.company.update({
         where: { id: input.companyId },
         data: {
+          ...(customCompanyName ? { name: customCompanyName.trim() } : {}),
           maxUsers: input.maxEmployees,
           maxStorageMb: BigInt(effectiveStorageMb),
         },

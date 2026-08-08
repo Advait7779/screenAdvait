@@ -94,10 +94,12 @@ export type GenerateLicenseInput = z.infer<typeof GenerateLicenseSchema>;
 
 export const UpsertCompanySubscriptionSchema = z.object({
   companyId: z.string().uuid('Valid company ID required'),
+  companyName: z.string().min(1).optional(),
   plan: z.nativeEnum(LicensePlan).default(LicensePlan.MONTHLY),
   maxEmployees: z.number().int().min(1).max(10000),
   maxDevices: z.number().int().min(1).max(50000),
   customExpiryDays: z.number().int().min(1).max(36500).optional(),
+  endDate: z.string().optional(),
 });
 
 export type UpsertCompanySubscriptionInput = z.infer<typeof UpsertCompanySubscriptionSchema>;

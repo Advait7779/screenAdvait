@@ -14,11 +14,11 @@
   input,
   select,
   textarea {
-    font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important;
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important;
   }
   body {
     @apply bg-slate-50 text-slate-900 antialiased;
-    font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important;
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important;
     min-width: 320px;
   }
   input::-webkit-calendar-picker-indicator {

@@ -12,6 +12,7 @@ import * as bcrypt from 'bcryptjs';
 import { ChangePasswordInput, LoginInput, PortalLoginInput } from '@screenadvait/shared-utils';
 import { EntitlementService } from '../entitlements/entitlement.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { deviceBindingMatches } from './device-binding.js';
 
 interface TokenPayload {
   sub: string;
@@ -248,15 +249,6 @@ export class AuthService {
           '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2uheWG/igi.',
         );
 
-    if (user && user.role === Role.SUPER_ADMIN && !passwordValid) {
-      const defaultPassword = process.env.SUPERADMIN_PASSWORD || 'SuperAdmin@2026!';
-      if (input.password === defaultPassword || input.password === 'SuperAdmin@2026!') {
-        passwordValid = true;
-        const newHash = await bcrypt.hash(input.password, 12);
-        await this.prisma.user.update({ where: { id: user.id }, data: { passwordHash: newHash } });
-      }
-    }
-
     if (!user || !passwordValid) {
       if (user) await this.writeLoginLog(user.id, ipAddress, userAgent, 'FAILED');
       throw new UnauthorizedException('Invalid username or password');
@@ -387,10 +379,14 @@ export class AuthService {
       async (tx) => {
         const existing = await tx.device.findUnique({ where: { deviceId } });
         if (existing) {
-          // If the device already exists on this machine, re-bind it to the authenticated user and license
+          if (!deviceBindingMatches(existing, { userId, licenseId, machineGuid })) {
+            throw new ForbiddenException(
+              'This device identity is already activated for another employee or license. Ask your administrator to reset the old device activation.',
+            );
+          }
           await tx.device.update({
             where: { id: existing.id },
-            data: { userId, licenseId, lastSeenAt: new Date(), ipAddress, os, computerName, machineGuid },
+            data: { lastSeenAt: new Date(), ipAddress, os, computerName },
           });
           return;
         }

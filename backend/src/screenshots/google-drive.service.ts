@@ -110,8 +110,9 @@ export class GoogleDriveService {
   }
 
   async deleteFile(fileId: string) {
-    if (fileId.startsWith('local:')) {
-      const absolutePath = this.resolveLocalFile(fileId);
+    if (fileId.startsWith('local:') || !this.driveClient) {
+      const localFileId = fileId.startsWith('local:') ? fileId : `local:${fileId}`;
+      const absolutePath = this.resolveLocalFile(localFileId);
       await fs.rm(absolutePath, { force: true });
       await this.pruneEmptyLocalParents(path.dirname(absolutePath), 4);
       return;

@@ -6,6 +6,7 @@ export function validateEnvironment(config: Record<string, unknown>) {
   const refreshSecret = String(config.JWT_REFRESH_SECRET || '');
   const databaseUrl = String(config.DATABASE_URL || '');
   const storageProvider = String(config.STORAGE_PROVIDER || 'local').toLowerCase();
+  const autoSeed = String(config.AUTO_SEED || 'false').toLowerCase() === 'true';
 
   if (!['development', 'test', 'production'].includes(nodeEnv)) {
     throw new Error('NODE_ENV must be development, test, or production');
@@ -22,6 +23,15 @@ export function validateEnvironment(config: Record<string, unknown>) {
   if (!['local', 'google-drive'].includes(storageProvider)) {
     throw new Error('STORAGE_PROVIDER must be local or google-drive');
   }
+  if (autoSeed) {
+    const superadminPassword = String(config.SUPERADMIN_PASSWORD || '');
+    const demoPassword = String(config.SEED_DEMO_PASSWORD || '');
+    if (superadminPassword.length < 12 || demoPassword.length < 12) {
+      throw new Error(
+        'AUTO_SEED requires SUPERADMIN_PASSWORD and SEED_DEMO_PASSWORD with at least 12 characters',
+      );
+    }
+  }
   if (nodeEnv === 'production') {
     if (jwtSecret === LEGACY_JWT_SECRET || /replace|change|secret/i.test(jwtSecret)) {
       throw new Error('A strong non-placeholder JWT_SECRET is required in production');
@@ -34,5 +44,5 @@ export function validateEnvironment(config: Record<string, unknown>) {
       throw new Error('Production CORS_ORIGINS must contain explicit HTTPS origins');
     }
   }
-  return { ...config, NODE_ENV: nodeEnv, STORAGE_PROVIDER: storageProvider };
+  return { ...config, NODE_ENV: nodeEnv, STORAGE_PROVIDER: storageProvider, AUTO_SEED: autoSeed };
 }

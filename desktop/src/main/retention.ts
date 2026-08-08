@@ -3,7 +3,7 @@ import path from 'path';
 import { app } from 'electron';
 import { getDb } from './sqlite.store.js';
 
-export const SCREENSHOT_RETENTION_DAYS = 7;
+export const SCREENSHOT_RETENTION_DAYS = 15;
 const RETENTION_INTERVAL_MS = 60 * 60 * 1000;
 const RETENTION_BATCH_SIZE = 1000;
 let retentionTimer: NodeJS.Timeout | null = null;
@@ -56,7 +56,9 @@ export function cleanupExpiredLocalScreenshots(now = Date.now()) {
   }
 
   if (deleted > 0) {
-    console.log(`[Retention] Removed ${deleted} local screenshot(s) older than 7 days`);
+    console.log(
+      `[Retention] Removed ${deleted} local screenshot(s) older than ${SCREENSHOT_RETENTION_DAYS} days`,
+    );
   }
   return deleted;
 }

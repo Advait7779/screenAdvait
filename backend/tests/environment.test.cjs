@@ -34,3 +34,18 @@ test('environment rejects unsupported storage providers', () => {
     /STORAGE_PROVIDER/,
   );
 });
+
+test('demo seeding is opt-in and requires separate strong passwords', () => {
+  assert.equal(validateEnvironment(valid).AUTO_SEED, false);
+  assert.throws(
+    () => validateEnvironment({ ...valid, AUTO_SEED: 'true' }),
+    /AUTO_SEED requires/,
+  );
+  const seeded = validateEnvironment({
+    ...valid,
+    AUTO_SEED: 'true',
+    SUPERADMIN_PASSWORD: 'Admin-Password-2026!',
+    SEED_DEMO_PASSWORD: 'Demo-Password-2026!',
+  });
+  assert.equal(seeded.AUTO_SEED, true);
+});

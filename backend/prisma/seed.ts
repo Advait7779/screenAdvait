@@ -10,22 +10,26 @@ import * as bcrypt from 'bcryptjs';
 const prisma = new PrismaClient();
 
 async function main() {
-  const isProduction = process.env.NODE_ENV === 'production';
-  const autoSeed = process.env.AUTO_SEED === 'true';
-
-  if (isProduction && !autoSeed) {
-    console.log('ℹ️ Seeding skipped (AUTO_SEED is not true in production)');
+  if (process.env.AUTO_SEED !== 'true') {
+    console.log('Seeding skipped because AUTO_SEED is not true');
     return;
   }
 
   const superadminEmail = process.env.SUPERADMIN_EMAIL || 'superadmin@system.com';
-  const superadminPassword = process.env.SUPERADMIN_PASSWORD || 'SuperAdmin@2026!';
   const superadminUsername = process.env.SUPERADMIN_USERNAME || 'superadmin';
+  const superadminPassword = process.env.SUPERADMIN_PASSWORD?.trim();
+  const demoPassword = process.env.SEED_DEMO_PASSWORD?.trim();
   const seedLicenseKey = process.env.SEED_DEMO_LICENSE_KEY || 'SA-DEMO-2026-KEY-9999';
 
-  console.log('🌱 Starting Database Seeding...');
+  if (!superadminPassword || superadminPassword.length < 12) {
+    throw new Error('AUTO_SEED requires SUPERADMIN_PASSWORD with at least 12 characters');
+  }
+  if (!demoPassword || demoPassword.length < 12) {
+    throw new Error('AUTO_SEED requires SEED_DEMO_PASSWORD with at least 12 characters');
+  }
 
-  // 1. Create Default Company
+  console.log('Starting explicit demo database seed...');
+
   const company = await prisma.company.upsert({
     where: { code: 'DEMO' },
     update: {},
@@ -35,55 +39,52 @@ async function main() {
       contactEmail: 'admin@demoenterprise.com',
       contactPhone: '+1-555-0192',
       maxUsers: 50,
-      maxStorageMb: BigInt(51200), // 50 GB
+      maxStorageMb: BigInt(51200),
     },
   });
 
-  const passwordHash = await bcrypt.hash(superadminPassword, 12);
+  const superadminPasswordHash = await bcrypt.hash(superadminPassword, 12);
+  const demoPasswordHash = await bcrypt.hash(demoPassword, 12);
 
-  // 2. Create Super Admin User
   const superAdmin = await prisma.user.upsert({
     where: { email: superadminEmail },
-    update: { passwordHash },
+    update: {},
     create: {
       companyId: company.id,
       email: superadminEmail,
       username: superadminUsername,
       fullName: 'Super Administrator',
-      passwordHash,
+      passwordHash: superadminPasswordHash,
       role: Role.SUPER_ADMIN,
     },
   });
 
-  // 3. Create Company Admin User
-  const companyAdmin = await prisma.user.upsert({
+  await prisma.user.upsert({
     where: { email: 'admin@demoenterprise.com' },
-    update: { passwordHash },
+    update: {},
     create: {
       companyId: company.id,
       email: 'admin@demoenterprise.com',
       username: 'compadmin',
       fullName: 'John Enterprise Admin',
-      passwordHash,
+      passwordHash: demoPasswordHash,
       role: Role.COMPANY_ADMIN,
     },
   });
 
-  // 4. Create Employee User
   const employee = await prisma.user.upsert({
     where: { email: 'employee1@demoenterprise.com' },
-    update: { passwordHash },
+    update: {},
     create: {
       companyId: company.id,
       email: 'employee1@demoenterprise.com',
       username: 'employee1',
       fullName: 'Alice Employee',
-      passwordHash,
+      passwordHash: demoPasswordHash,
       role: Role.EMPLOYEE,
     },
   });
 
-  // 5. Create the company subscription, then a child employee license.
   const issueDate = new Date();
   const expiryDate = new Date();
   expiryDate.setFullYear(issueDate.getFullYear() + 1);
@@ -124,18 +125,15 @@ async function main() {
     },
   });
 
-  console.log('✅ Database Seeding Complete!');
-  console.log('----------------------------------------------------');
+  console.log('Database seed complete');
   console.log(`Company: ${company.name} (${company.code})`);
   console.log(`License Key: ${license.key} (Plan: ${license.plan})`);
-  console.log('User Credentials:');
-  console.log('Demo users created. Password values are intentionally not printed.');
-  console.log('----------------------------------------------------');
+  console.log('Password values were not printed and existing account passwords were preserved.');
 }
 
 main()
-  .catch((e) => {
-    console.error(e);
+  .catch((error) => {
+    console.error(error);
     process.exit(1);
   })
   .finally(async () => {

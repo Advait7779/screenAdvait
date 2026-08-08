@@ -17,6 +17,7 @@ import { uploadDirectToGoogleDrive } from './google-drive-client.js';
 
 let captureTimer: NodeJS.Timeout | null = null;
 let uploadTimer: NodeJS.Timeout | null = null;
+let syncTimer: NodeJS.Timeout | null = null;
 let captureInProgress = false;
 let uploadInProgress = false;
 let targetNextCaptureTime = 0;

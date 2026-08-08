@@ -1,9 +1,16 @@
-import { Injectable, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  ConflictException,
+  NotFoundException,
+  BadRequestException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { Prisma, Role } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CreateCompanyInput } from '@screenadvait/shared-utils';
 import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
+import { GoogleDriveService } from '../screenshots/google-drive.service.js';
 
 export type CreateCompanyParams = CreateCompanyInput & {
   adminUsername?: string;
@@ -12,7 +19,10 @@ export type CreateCompanyParams = CreateCompanyInput & {
 
 @Injectable()
 export class CompanyService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly storage: GoogleDriveService,
+  ) {}
 
   async createCompany(input: CreateCompanyParams, createdByUserId: string) {
     const existing = await this.prisma.company.findFirst({
@@ -168,7 +178,7 @@ export class CompanyService {
     // Collect screenshot file keys for disk cleanup
     const screenshots = await this.prisma.screenshot.findMany({
       where: { companyId },
-      select: { fileKey: true },
+      select: { fileKey: true, driveFileId: true },
     });
 
     const deletedCounts = {
@@ -177,6 +187,19 @@ export class CompanyService {
       screenshots: company._count.screenshots,
       subscriptions: company._count.subscriptions,
     };
+
+    // Remove screenshot binaries before deleting their database records. A failed
+    // file cleanup aborts the company deletion so it can be retried safely.
+    try {
+      for (const screenshot of screenshots) {
+        await this.storage.deleteFile(screenshot.driveFileId || screenshot.fileKey);
+      }
+    } catch (error) {
+      throw new ServiceUnavailableException(
+        'Could not remove all company screenshot files. The company was not deleted; try again.',
+        { cause: error },
+      );
+    }
 
     // Delete all child records in dependency order inside a transaction
     await this.prisma.$transaction(async (tx) => {
@@ -241,21 +264,6 @@ export class CompanyService {
       // 9. Company
       await tx.company.delete({ where: { id: companyId } });
     });
-
-    // Clean up screenshot files from disk (non-blocking)
-    const fs = await import('fs');
-    const path = await import('path');
-    const storagePath = process.env.LOCAL_STORAGE_PATH || './storage';
-    for (const ss of screenshots) {
-      try {
-        const fullPath = path.resolve(storagePath, ss.fileKey);
-        if (fs.existsSync(fullPath)) {
-          fs.unlinkSync(fullPath);
-        }
-      } catch {
-        // Ignore file cleanup errors
-      }
-    }
 
     return {
       success: true,

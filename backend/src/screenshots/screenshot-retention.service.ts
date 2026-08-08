@@ -4,7 +4,7 @@ import { GoogleDriveService } from './google-drive.service.js';
 import { promises as fs } from 'fs';
 import * as path from 'path';
 
-const DEFAULT_RETENTION_DAYS = 7;
+const DEFAULT_RETENTION_DAYS = 15;
 const CLEANUP_INTERVAL_MS = 60 * 60 * 1000;
 const CLEANUP_BATCH_SIZE = 500;
 const RETENTION_LOCK_ID = BigInt('721420260729');

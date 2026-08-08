@@ -8,7 +8,11 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 
   async onModuleInit() {
     await this.$connect();
-    await this.ensureInitialSeed();
+    if (process.env.AUTO_SEED === 'true') {
+      await this.ensureInitialSeed();
+    } else {
+      this.logger.log('Automatic demo seed is disabled');
+    }
   }
 
   async onModuleDestroy() {
@@ -20,9 +24,17 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       this.logger.log('🌱 Checking / Initializing SuperAdmin credentials...');
 
       const superadminEmail = (process.env.SUPERADMIN_EMAIL || 'superadmin@system.com').trim().toLowerCase();
-      const superadminPassword = process.env.SUPERADMIN_PASSWORD || 'SuperAdmin@2026!';
+      const superadminPassword = process.env.SUPERADMIN_PASSWORD?.trim();
+      const demoPassword = process.env.SEED_DEMO_PASSWORD?.trim();
       const superadminUsername = (process.env.SUPERADMIN_USERNAME || 'superadmin').trim();
       const seedLicenseKey = process.env.SEED_DEMO_LICENSE_KEY || 'SA-DEMO-2026-KEY-9999';
+
+      if (!superadminPassword || superadminPassword.length < 12) {
+        throw new Error('AUTO_SEED requires SUPERADMIN_PASSWORD with at least 12 characters');
+      }
+      if (!demoPassword || demoPassword.length < 12) {
+        throw new Error('AUTO_SEED requires SEED_DEMO_PASSWORD with at least 12 characters');
+      }
 
       // 1. Create / Ensure Default Company
       const company = await this.company.upsert({
@@ -38,7 +50,8 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
         },
       });
 
-      const passwordHash = await bcrypt.hash(superadminPassword, 12);
+      const superadminPasswordHash = await bcrypt.hash(superadminPassword, 12);
+      const demoPasswordHash = await bcrypt.hash(demoPassword, 12);
 
       // 2. Ensure Super Admin User — handle username/email conflicts gracefully
       //    First, claim the username by updating any existing user that has it
@@ -50,13 +63,13 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
         // Same user has both — just update
         superAdmin = await this.user.update({
           where: { id: existingByUsername.id },
-          data: { passwordHash, role: Role.SUPER_ADMIN, isActive: true },
+          data: { role: Role.SUPER_ADMIN, isActive: true },
         });
       } else if (existingByUsername) {
         // Username exists with a different email — update that user's email + password
         superAdmin = await this.user.update({
           where: { id: existingByUsername.id },
-          data: { email: superadminEmail, passwordHash, role: Role.SUPER_ADMIN, isActive: true },
+          data: { email: superadminEmail, role: Role.SUPER_ADMIN, isActive: true },
         });
         // If a different user had the target email, clear it to avoid conflict
         if (existingByEmail && existingByEmail.id !== existingByUsername.id) {
@@ -69,7 +82,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
         // Email exists but different username — update username
         superAdmin = await this.user.update({
           where: { id: existingByEmail.id },
-          data: { username: superadminUsername, passwordHash, role: Role.SUPER_ADMIN, isActive: true },
+          data: { username: superadminUsername, role: Role.SUPER_ADMIN, isActive: true },
         });
       } else {
         // Neither exists — create fresh
@@ -79,7 +92,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
             email: superadminEmail,
             username: superadminUsername,
             fullName: 'Super Administrator',
-            passwordHash,
+            passwordHash: superadminPasswordHash,
             role: Role.SUPER_ADMIN,
             isActive: true,
           },
@@ -89,13 +102,13 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       // 3. Ensure Company Admin User
       const companyAdmin = await this.user.upsert({
         where: { email: 'admin@demoenterprise.com' },
-        update: { passwordHash, isActive: true },
+        update: { isActive: true },
         create: {
           companyId: company.id,
           email: 'admin@demoenterprise.com',
           username: 'compadmin',
           fullName: 'John Enterprise Admin',
-          passwordHash,
+          passwordHash: demoPasswordHash,
           role: Role.COMPANY_ADMIN,
           isActive: true,
         },
@@ -104,13 +117,13 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       // 4. Ensure Employee User
       const employee = await this.user.upsert({
         where: { email: 'employee1@demoenterprise.com' },
-        update: { passwordHash, isActive: true },
+        update: { isActive: true },
         create: {
           companyId: company.id,
           email: 'employee1@demoenterprise.com',
           username: 'employee1',
           fullName: 'Alice Employee',
-          passwordHash,
+          passwordHash: demoPasswordHash,
           role: Role.EMPLOYEE,
           isActive: true,
         },

@@ -242,7 +242,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ addToast }) => {
           <Trash2 className="w-4 h-4 mt-0.5 text-green-700 shrink-0" />
           <div>
             <div className="text-xs font-semibold text-green-900">
-              Automatic 7-day screenshot cleanup is active
+              Automatic 15-day screenshot cleanup is active
             </div>
             <div className="text-xs text-green-800/80 mt-0.5">
               Expired images, queue records, and empty date folders are removed automatically

@@ -69,6 +69,32 @@ pnpm dev:admin    # SuperAdmin on :3001
 pnpm dev:company  # Company on :3002
 ```
 
+## Production SuperAdmin Provisioning
+
+Keep `AUTO_SEED=false` in production. The `SUPERADMIN_*` environment variables
+do not modify the database during normal backend startup.
+
+To create the first SuperAdmin or securely reset an existing one:
+
+1. Set `SUPERADMIN_USERNAME`, `SUPERADMIN_EMAIL`, and `SUPERADMIN_PASSWORD` on
+   the backend resource. `SUPERADMIN_FULL_NAME` is optional.
+2. Deploy the backend so the provisioning command is present in `dist`.
+3. Run this once in the backend container terminal:
+
+   ```bash
+   npm run superadmin:provision
+   ```
+
+The command creates the account when absent. When the account exists, it resets
+the password, restores the `SUPER_ADMIN` role, activates the account, and
+invalidates its existing sessions. It refuses to continue if the configured
+username and email belong to different users.
+
+Remove `SUPERADMIN_PASSWORD` from the long-lived deployment environment after
+successful provisioning. Set a temporary value again only when recovery is
+needed. Do not enable `AUTO_SEED` for this operation because that mode also
+creates demo data.
+
 ## Tech Stack
 
 - **Frontend**: React, Vite, TailwindCSS

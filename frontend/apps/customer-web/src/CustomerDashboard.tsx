@@ -446,6 +446,10 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
       window.open(url, '_blank', 'noopener,noreferrer');
       window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (error: any) {
+      if (item.driveViewUrl) {
+        window.open(item.driveViewUrl, '_blank', 'noopener,noreferrer');
+        return;
+      }
       let msg = 'Could not open screenshot';
       if (error.response?.data instanceof Blob) {
         try {

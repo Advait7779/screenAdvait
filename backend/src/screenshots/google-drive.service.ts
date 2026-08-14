@@ -1,8 +1,10 @@
-import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
+import { Injectable, Logger, ServiceUnavailableException, Optional } from '@nestjs/common';
 import { google } from 'googleapis';
 import { promises as fs } from 'fs';
 import * as path from 'path';
 import { Readable } from 'stream';
+import { PrismaService } from '../prisma/prisma.service.js';
+import { decryptText } from '../common/crypto.util.js';
 
 export interface StoredScreenshot {
   fileId: string;
@@ -19,7 +21,7 @@ export class GoogleDriveService {
   private driveClient: ReturnType<typeof google.drive> | null = null;
   private driveRootFolderId: string | null = null;
 
-  constructor() {
+  constructor(@Optional() private readonly prisma?: PrismaService) {
     this.initDriveClient();
   }
 
@@ -97,26 +99,97 @@ export class GoogleDriveService {
     }
   }
 
-  async readFile(fileId: string): Promise<Buffer> {
+  async readFile(fileId: string, companyId?: string): Promise<Buffer> {
     if (fileId.startsWith('local:')) {
-      return fs.readFile(this.resolveLocalFile(fileId));
+      try {
+        return await fs.readFile(this.resolveLocalFile(fileId));
+      } catch (err) {
+        const fallback = await this.findLocalFileFallback(path.basename(fileId.slice('local:'.length)));
+        if (fallback) return await fs.readFile(fallback);
+        throw err;
+      }
     }
-    if (!this.driveClient) throw new ServiceUnavailableException('Google Drive API is not configured');
-    const response = await this.driveClient.files.get(
-      { fileId, alt: 'media' },
-      { responseType: 'arraybuffer' },
-    );
-    return Buffer.from(response.data as ArrayBuffer);
+
+    if (fileId.includes('/') || fileId.includes('\\')) {
+      try {
+        const directLocal = path.resolve(this.localRoot, fileId.replace(/^local:/, ''));
+        if (directLocal.startsWith(`${this.localRoot}${path.sep}`)) {
+          return await fs.readFile(directLocal);
+        }
+      } catch {
+        // continue
+      }
+    }
+
+    if (companyId && this.prisma) {
+      try {
+        const conn = await this.prisma.googleDriveConnection.findUnique({
+          where: { companyId },
+        });
+        if (conn?.refreshTokenEncrypted) {
+          const { refreshToken, clientId, clientSecret } = JSON.parse(decryptText(conn.refreshTokenEncrypted));
+          const oauth2Client = new google.auth.OAuth2(
+            clientId || process.env.GOOGLE_DRIVE_CLIENT_ID || '407408718192.apps.googleusercontent.com',
+            clientSecret || process.env.GOOGLE_DRIVE_CLIENT_SECRET || '',
+          );
+          oauth2Client.setCredentials({ refresh_token: refreshToken });
+          const companyDrive = google.drive({ version: 'v3', auth: oauth2Client });
+          const response = await companyDrive.files.get(
+            { fileId, alt: 'media' },
+            { responseType: 'arraybuffer' },
+          );
+          return Buffer.from(response.data as ArrayBuffer);
+        }
+      } catch (companyDriveErr: any) {
+        this.logger.warn(`Could not read file ${fileId} from company drive: ${companyDriveErr?.message || companyDriveErr}`);
+      }
+    }
+
+    if (this.driveClient) {
+      const response = await this.driveClient.files.get(
+        { fileId, alt: 'media' },
+        { responseType: 'arraybuffer' },
+      );
+      return Buffer.from(response.data as ArrayBuffer);
+    }
+
+    throw new ServiceUnavailableException('Storage file cannot be retrieved');
   }
 
-  async deleteFile(fileId: string) {
-    if (fileId.startsWith('local:') || !this.driveClient) {
+  async deleteFile(fileId: string, companyId?: string) {
+    if (fileId.startsWith('local:')) {
       const localFileId = fileId.startsWith('local:') ? fileId : `local:${fileId}`;
-      const absolutePath = this.resolveLocalFile(localFileId);
-      await fs.rm(absolutePath, { force: true });
-      await this.pruneEmptyLocalParents(path.dirname(absolutePath), 4);
+      try {
+        const absolutePath = this.resolveLocalFile(localFileId);
+        await fs.rm(absolutePath, { force: true });
+        await this.pruneEmptyLocalParents(path.dirname(absolutePath), 4);
+      } catch {
+        // ignore
+      }
       return;
     }
+
+    if (companyId && this.prisma) {
+      try {
+        const conn = await this.prisma.googleDriveConnection.findUnique({
+          where: { companyId },
+        });
+        if (conn?.refreshTokenEncrypted) {
+          const { refreshToken, clientId, clientSecret } = JSON.parse(decryptText(conn.refreshTokenEncrypted));
+          const oauth2Client = new google.auth.OAuth2(
+            clientId || process.env.GOOGLE_DRIVE_CLIENT_ID || '407408718192.apps.googleusercontent.com',
+            clientSecret || process.env.GOOGLE_DRIVE_CLIENT_SECRET || '',
+          );
+          oauth2Client.setCredentials({ refresh_token: refreshToken });
+          const companyDrive = google.drive({ version: 'v3', auth: oauth2Client });
+          await companyDrive.files.delete({ fileId });
+          return;
+        }
+      } catch (error) {
+        if (this.isNotFound(error)) return;
+      }
+    }
+
     if (this.driveClient) {
       let metadata;
       try {
@@ -134,6 +207,29 @@ export class GoogleDriveService {
         if (!this.isNotFound(error)) throw error;
       }
       await this.pruneEmptyDriveParents(metadata.data.parents || [], 4);
+    }
+  }
+
+  private async findLocalFileFallback(fileName: string): Promise<string | null> {
+    try {
+      const searchDir = async (dir: string, depth = 0): Promise<string | null> => {
+        if (depth > 6) return null;
+        const entries = await fs.readdir(dir, { withFileTypes: true });
+        for (const entry of entries) {
+          const fullPath = path.join(dir, entry.name);
+          if (entry.isFile() && (entry.name === fileName || entry.name.endsWith(fileName))) {
+            return fullPath;
+          }
+          if (entry.isDirectory()) {
+            const found = await searchDir(fullPath, depth + 1);
+            if (found) return found;
+          }
+        }
+        return null;
+      };
+      return await searchDir(this.localRoot);
+    } catch {
+      return null;
     }
   }
 

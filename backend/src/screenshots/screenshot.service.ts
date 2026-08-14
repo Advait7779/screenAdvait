@@ -199,7 +199,10 @@ export class ScreenshotService implements OnModuleInit {
     if (!permitted) throw new ForbiddenException('You cannot access this screenshot');
 
     try {
-      const buffer = await this.storage.readFile(screenshot.driveFileId || screenshot.fileKey);
+      const buffer = await this.storage.readFile(
+        screenshot.driveFileId || screenshot.fileKey,
+        screenshot.companyId,
+      );
       return {
         buffer,
         mimeType: screenshot.mimeType,

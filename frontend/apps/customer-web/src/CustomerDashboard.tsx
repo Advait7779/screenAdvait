@@ -757,7 +757,7 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
                 <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <h2 className="text-base font-bold text-gray-900">Latest Captured Employee Screenshots</h2>
-                    <p className="text-xs text-gray-500 mt-0.5">Showing recent 5 screenshot records. Open a folder to view details.</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Showing recent date folders and employee captures. Open a folder to view details.</p>
                   </div>
                   {screenshots.length > 5 && (
                     <button
@@ -770,9 +770,9 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
                     </button>
                   )}
                 </div>
-                {screenshots.length ? (
+                {screenshotDays.length ? (
                   <div className="space-y-3">
-                    {buildGroupedDays(screenshots.slice(0, 5)).map((day: any) => {
+                    {screenshotDays.slice(0, 5).map((day: any) => {
                       const dateOpen = Boolean(expandedDates[day.key] ?? false);
                       return (
                         <section key={day.key} className="overflow-hidden rounded-md border border-gray-200 bg-white shadow-sm">
@@ -823,22 +823,22 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
                                     </button>
 
                                     {employeeOpen && (
-                                      <div className="max-h-[380px] overflow-y-auto border-t border-gray-100 bg-gray-50/70 p-3">
-                                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8">
+                                      <div className="max-h-[420px] overflow-y-auto border-t border-gray-100 bg-gray-50/70 p-3 sm:p-4">
+                                        <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-2 sm:gap-2.5">
                                           {employeeFolder.items.map((item: any) => (
                                             <button
                                               key={item.id}
                                               type="button"
                                               onClick={() => openScreenshot(item)}
                                               title={`Click to view ${item.fileName} (${new Date(item.capturedAt).toLocaleTimeString()})`}
-                                              className="group flex flex-col justify-between rounded-md border border-gray-200 bg-white p-2.5 text-left transition-all hover:border-green-600 hover:bg-green-50/60 hover:shadow-md"
+                                              className="group flex flex-col justify-between rounded-md border border-gray-200 bg-white p-2 text-left transition-all hover:border-green-600 hover:bg-green-50/60 hover:shadow-sm"
                                             >
                                               <div className="flex w-full items-center justify-between gap-1 text-[11px] font-bold text-gray-800 group-hover:text-green-900">
                                                 <span className="truncate">{new Date(item.capturedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
                                                 <ExternalLink className="h-3 w-3 shrink-0 text-gray-400 group-hover:text-green-700" />
                                               </div>
                                               <div className="mt-1.5 flex min-w-0 items-center justify-between text-[10px] font-mono text-gray-500">
-                                                <span className="max-w-[75px] truncate" title={item.fileName}>{item.fileName}</span>
+                                                <span className="max-w-[70px] truncate" title={item.fileName}>{item.fileName}</span>
                                                 <span className="shrink-0 font-sans font-medium text-gray-400">{fileSizeLabel(item.fileSize)}</span>
                                               </div>
                                             </button>
@@ -857,7 +857,7 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
 
                     <div className="mt-5 p-4 bg-white border border-gray-200 rounded-md flex flex-wrap items-center justify-between gap-3 shadow-sm">
                       <div className="text-xs text-gray-600 font-medium">
-                        Showing <b>latest 5</b> employee captures out of <b>{screenshots.length} total</b>.
+                        Showing <b>latest {Math.min(5, screenshotDays.length)}</b> date folders ({screenshots.length} total screenshots).
                       </div>
                       <button
                         type="button"
@@ -899,20 +899,20 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
                   </div>
 
                   <div className="flex items-center space-x-2 text-xs text-gray-600">
-                    <span className="font-medium">Records per page:</span>
+                    <span className="font-medium">Folders per page:</span>
                     <div className="relative" ref={archiveDropdownRef}>
                       <button
                         type="button"
                         onClick={() => setArchiveDropdownOpen((prev) => !prev)}
                         className="bg-white hover:bg-gray-50 border border-gray-200 hover:border-green-600 text-gray-800 text-xs font-semibold rounded-md px-3 py-1.5 flex items-center space-x-2 shadow-sm transition-all outline-none focus:border-green-600 focus:ring-2 focus:ring-green-100"
                       >
-                        <span>{archivePageSize} records</span>
+                        <span>{archivePageSize} date folders</span>
                         <ChevronDown className={`w-3.5 h-3.5 text-gray-500 transition-transform ${archiveDropdownOpen ? 'rotate-180 text-green-700' : ''}`} />
                       </button>
 
                       {archiveDropdownOpen && (
                         <div className="absolute right-0 top-full mt-1.5 w-36 bg-white border border-gray-200 rounded-md shadow-lg py-1 z-30 page-fade-in">
-                          {[10, 15, 20, 25].map((size) => (
+                          {[5, 10, 15, 20, 30].map((size) => (
                             <button
                               key={size}
                               type="button"
@@ -927,7 +927,7 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
                                   : 'text-gray-700 hover:bg-green-50/70 hover:text-green-900'
                               }`}
                             >
-                              <span>{size} records</span>
+                              <span>{size} folders</span>
                               {archivePageSize === size && <Check className="w-3.5 h-3.5 text-green-700 shrink-0" />}
                             </button>
                           ))}
@@ -945,19 +945,20 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
                     return user.toLowerCase().includes(q) || (item.fileName || '').toLowerCase().includes(q);
                   });
 
-                  const totalItems = matching.length;
-                  const totalPages = Math.max(1, Math.ceil(totalItems / archivePageSize));
+                  const allArchiveDays = buildGroupedDays(matching);
+                  const totalDays = allArchiveDays.length;
+                  const totalScreenshots = matching.length;
+                  const totalPages = Math.max(1, Math.ceil(totalDays / archivePageSize));
                   const safePage = Math.min(Math.max(1, archivePage), totalPages);
                   const startIndex = (safePage - 1) * archivePageSize;
-                  const endIndex = Math.min(startIndex + archivePageSize, totalItems);
-                  const paginatedItems = matching.slice(startIndex, endIndex);
-                  const archiveDays = buildGroupedDays(paginatedItems);
+                  const endIndex = Math.min(startIndex + archivePageSize, totalDays);
+                  const paginatedDays = allArchiveDays.slice(startIndex, endIndex);
 
                   return (
                     <>
-                      {archiveDays.length > 0 ? (
+                      {paginatedDays.length > 0 ? (
                         <div className="space-y-3">
-                          {archiveDays.map((day: any) => {
+                          {paginatedDays.map((day: any) => {
                             const dateOpen = Boolean(expandedDates[`archive::${day.key}`] ?? false);
                             return (
                               <section key={day.key} className="overflow-hidden rounded-md border border-gray-200 bg-white shadow-sm">
@@ -998,22 +999,22 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
                                             {employeeOpen ? <ChevronDown className="h-4 w-4 shrink-0 text-gray-400" /> : <ChevronRight className="h-4 w-4 shrink-0 text-gray-400" />}
                                           </button>
                                           {employeeOpen && (
-                                            <div className="max-h-[380px] overflow-y-auto border-t border-gray-100 bg-gray-50/70 p-3">
-                                              <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 2xl:grid-cols-12">
+                                            <div className="max-h-[420px] overflow-y-auto border-t border-gray-100 bg-gray-50/70 p-3 sm:p-4">
+                                              <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-2 sm:gap-2.5">
                                                 {employeeFolder.items.map((item: any) => (
                                                   <button
                                                     key={item.id}
                                                     type="button"
                                                     onClick={() => openScreenshot(item)}
                                                     title={`Click to view ${item.fileName} (${new Date(item.capturedAt).toLocaleTimeString()})`}
-                                                    className="group flex flex-col justify-between rounded-md border border-gray-200 bg-white p-1.5 px-2 text-left transition-all hover:border-green-600 hover:bg-green-50/60 hover:shadow-md"
+                                                    className="group flex flex-col justify-between rounded-md border border-gray-200 bg-white p-2 text-left transition-all hover:border-green-600 hover:bg-green-50/60 hover:shadow-md"
                                                   >
-                                                    <div className="flex w-full items-center justify-between gap-1 text-[10px] font-bold text-gray-800 group-hover:text-green-900">
+                                                    <div className="flex w-full items-center justify-between gap-1 text-[11px] font-bold text-gray-800 group-hover:text-green-900">
                                                       <span className="truncate">{new Date(item.capturedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
-                                                      <ExternalLink className="h-2.5 w-2.5 shrink-0 text-gray-400 group-hover:text-green-700" />
+                                                      <ExternalLink className="h-3 w-3 shrink-0 text-gray-400 group-hover:text-green-700" />
                                                     </div>
-                                                    <div className="mt-1 flex min-w-0 items-center justify-between text-[9px] font-mono text-gray-500">
-                                                      <span className="max-w-[50px] truncate" title={item.fileName}>{item.fileName}</span>
+                                                    <div className="mt-1.5 flex min-w-0 items-center justify-between text-[10px] font-mono text-gray-500">
+                                                      <span className="max-w-[70px] truncate" title={item.fileName}>{item.fileName}</span>
                                                       <span className="shrink-0 font-sans font-medium text-gray-400">{fileSizeLabel(item.fileSize)}</span>
                                                     </div>
                                                   </button>
@@ -1037,10 +1038,10 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
                         </div>
                       )}
 
-                      {totalItems > 0 && (
+                      {totalDays > 0 && (
                         <div className="p-4 bg-white border border-gray-200 rounded-md flex flex-wrap items-center justify-between gap-3 text-xs shadow-sm">
                           <div className="text-gray-500 font-medium">
-                            Showing <span className="font-bold text-gray-800">{startIndex + 1}</span> to <span className="font-bold text-gray-800">{endIndex}</span> of <span className="font-bold text-gray-800">{totalItems}</span> screenshots
+                            Showing <span className="font-bold text-gray-800">{startIndex + 1}</span> to <span className="font-bold text-gray-800">{endIndex}</span> of <span className="font-bold text-gray-800">{totalDays}</span> date folder{totalDays === 1 ? '' : 's'} ({totalScreenshots} total screenshot{totalScreenshots === 1 ? '' : 's'})
                           </div>
 
                           <div className="flex items-center space-x-1.5">

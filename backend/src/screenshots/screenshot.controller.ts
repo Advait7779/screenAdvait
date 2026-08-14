@@ -132,10 +132,13 @@ export class ScreenshotController {
     @Res() res: Response,
   ) {
     const file = await this.screenshotService.getFile(id, req.user);
+    if ((file as any).redirectUrl) {
+      return res.redirect((file as any).redirectUrl);
+    }
     res.setHeader('Content-Type', file.mimeType);
     res.setHeader('Content-Disposition', `inline; filename="${file.fileName.replace(/[\r\n"\\]/g, '_')}"`);
     res.setHeader('Cache-Control', 'private, max-age=300');
-    res.send(file.buffer);
+    res.send((file as any).buffer);
   }
 
   private parseLimit(value?: string) {

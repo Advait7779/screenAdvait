@@ -209,6 +209,20 @@ export class ScreenshotService implements OnModuleInit {
         fileName: screenshot.fileName,
       };
     } catch (error: any) {
+      if (screenshot.driveViewUrl) {
+        return {
+          redirectUrl: screenshot.driveViewUrl,
+          mimeType: screenshot.mimeType,
+          fileName: screenshot.fileName,
+        };
+      }
+      if (screenshot.driveFileId && !screenshot.driveFileId.startsWith('local:')) {
+        return {
+          redirectUrl: `https://drive.google.com/file/d/${screenshot.driveFileId}/view`,
+          mimeType: screenshot.mimeType,
+          fileName: screenshot.fileName,
+        };
+      }
       throw new NotFoundException('Screenshot image file is missing or deleted from storage');
     }
   }

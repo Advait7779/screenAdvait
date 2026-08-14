@@ -354,36 +354,9 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
     }
   };
 
-  const openScreenshot = async (item: any) => {
-    try {
-      const response = await axios.get(`${API_URL}/screenshots/${item.id}/file`, {
-        ...auth(token),
-        responseType: 'blob',
-      });
-      const url = URL.createObjectURL(response.data);
-      window.open(url, '_blank', 'noopener,noreferrer');
-      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
-    } catch (error: any) {
-      if (item.driveViewUrl) {
-        window.open(item.driveViewUrl, '_blank', 'noopener,noreferrer');
-        return;
-      }
-      let msg = 'Could not open screenshot';
-      if (error.response?.data instanceof Blob) {
-        try {
-          const text = await error.response.data.text();
-          const json = JSON.parse(text);
-          if (json.message) msg = json.message;
-        } catch {
-          if (error.response?.status === 404) {
-            msg = 'Screenshot image file is missing or deleted from storage';
-          }
-        }
-      } else if (error.response?.status === 404) {
-        msg = 'Screenshot image file is missing or deleted from storage';
-      }
-      show(msg, true);
-    }
+  const openScreenshot = (item: any) => {
+    const fileUrl = `${API_URL}/screenshots/${item.id}/file?token=${encodeURIComponent(token)}`;
+    window.open(fileUrl, '_blank', 'noopener,noreferrer');
   };
 
   const subscription = overview?.subscription;

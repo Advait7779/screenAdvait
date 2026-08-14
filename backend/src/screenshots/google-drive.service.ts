@@ -99,7 +99,11 @@ export class GoogleDriveService {
     }
   }
 
-  private getPossibleStorageRoots(): string[] {
+  getLocalRoot(): string {
+    return this.localRoot;
+  }
+
+  getStorageRoots(): string[] {
     const roots: string[] = [
       this.localRoot,
       path.resolve(process.cwd(), 'storage'),
@@ -115,35 +119,45 @@ export class GoogleDriveService {
   }
 
   async readFile(fileId: string, companyId?: string): Promise<Buffer> {
+    const isLocalId = fileId.startsWith('local:') || fileId.includes('/') || fileId.includes('\\');
     const cleanRelative = fileId.replace(/^local:/, '');
 
-    // 1. Try direct resolution across all candidate storage roots
-    for (const root of this.getPossibleStorageRoots()) {
-      try {
-        const full = path.resolve(root, cleanRelative);
-        const stat = await fs.stat(full);
-        if (stat.isFile()) {
-          return await fs.readFile(full);
+    // ─── LOCAL FILE PATH ───
+    if (isLocalId) {
+      // 1a. Try direct resolution across all candidate storage roots
+      for (const root of this.getStorageRoots()) {
+        try {
+          const full = path.resolve(root, cleanRelative);
+          const stat = await fs.stat(full);
+          if (stat.isFile()) {
+            this.logger.log(`[readFile] Found local file at: ${full}`);
+            return await fs.readFile(full);
+          }
+        } catch {
+          // try next
         }
-      } catch {
-        // try next
       }
+
+      // 1b. Try searching by filename across candidate storage roots
+      const baseName = path.basename(cleanRelative);
+      for (const root of this.getStorageRoots()) {
+        try {
+          const fallback = await this.findLocalFileFallback(baseName, root);
+          if (fallback) {
+            this.logger.log(`[readFile] Found local file via fallback at: ${fallback}`);
+            return await fs.readFile(fallback);
+          }
+        } catch {
+          // continue
+        }
+      }
+
+      this.logger.warn(`[readFile] Local file not found anywhere: ${fileId}, roots tried: ${JSON.stringify(this.getStorageRoots())}`);
+      throw new Error(`Local file not found: ${fileId}`);
     }
 
-    // 2. Try searching by filename across candidate storage roots
-    const baseName = path.basename(cleanRelative);
-    for (const root of this.getPossibleStorageRoots()) {
-      try {
-        const fallback = await this.findLocalFileFallback(baseName, root);
-        if (fallback) {
-          return await fs.readFile(fallback);
-        }
-      } catch {
-        // continue
-      }
-    }
-
-    // 3. Try reading from Company's connected Google Drive if companyId is provided
+    // ─── GOOGLE DRIVE FILE ID ───
+    // 2. Try reading from Company's connected Google Drive
     if (companyId && this.prisma) {
       try {
         const conn = await this.prisma.googleDriveConnection.findUnique({
@@ -157,36 +171,43 @@ export class GoogleDriveService {
           );
           oauth2Client.setCredentials({ refresh_token: refreshToken });
           const companyDrive = google.drive({ version: 'v3', auth: oauth2Client });
+          this.logger.log(`[readFile] Attempting company drive read for fileId=${fileId}`);
           const response = await companyDrive.files.get(
-            { fileId: cleanRelative, alt: 'media' },
+            { fileId, alt: 'media' },
             { responseType: 'arraybuffer' },
           );
+          this.logger.log(`[readFile] Successfully read from company drive: ${fileId}`);
           return Buffer.from(response.data as ArrayBuffer);
+        } else {
+          this.logger.warn(`[readFile] Company ${companyId} has drive connection but no encrypted token`);
         }
       } catch (companyDriveErr: any) {
-        this.logger.warn(`Could not read file ${cleanRelative} from company drive: ${companyDriveErr?.message || companyDriveErr}`);
+        this.logger.error(`[readFile] Company drive read FAILED for fileId=${fileId}: ${companyDriveErr?.message || companyDriveErr}`);
       }
+    } else {
+      this.logger.warn(`[readFile] No companyId (${companyId}) or no prisma for drive lookup`);
     }
 
-    // 4. Try reading from system Google Drive if configured
+    // 3. Try reading from system Google Drive
     if (this.driveClient) {
       try {
+        this.logger.log(`[readFile] Attempting system drive read for fileId=${fileId}`);
         const response = await this.driveClient.files.get(
-          { fileId: cleanRelative, alt: 'media' },
+          { fileId, alt: 'media' },
           { responseType: 'arraybuffer' },
         );
         return Buffer.from(response.data as ArrayBuffer);
       } catch (err: any) {
-        this.logger.warn(`System drive read failed for ${cleanRelative}: ${err?.message}`);
+        this.logger.error(`[readFile] System drive read FAILED for fileId=${fileId}: ${err?.message}`);
       }
     }
 
-    throw new ServiceUnavailableException('Storage file cannot be retrieved');
+    throw new Error(`Cannot retrieve file: ${fileId}`);
   }
 
   async deleteFile(fileId: string, companyId?: string) {
     const cleanRelative = fileId.replace(/^local:/, '');
-    for (const root of this.getPossibleStorageRoots()) {
+    for (const root of this.getStorageRoots()) {
       try {
         const full = path.resolve(root, cleanRelative);
         await fs.rm(full, { force: true });

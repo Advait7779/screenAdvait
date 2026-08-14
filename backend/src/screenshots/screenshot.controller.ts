@@ -141,6 +141,15 @@ export class ScreenshotController {
     res.send((file as any).buffer);
   }
 
+  @Get(':id/debug')
+  @Roles(Role.COMPANY_ADMIN, Role.SUPER_ADMIN)
+  debugScreenshot(
+    @Param('id') id: string,
+    @Req() req: any,
+  ) {
+    return this.screenshotService.debugScreenshot(id, req.user);
+  }
+
   private parseLimit(value?: string) {
     if (!value) return 500;
     const parsed = Number(value);

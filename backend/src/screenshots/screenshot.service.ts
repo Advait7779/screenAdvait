@@ -198,33 +198,102 @@ export class ScreenshotService implements OnModuleInit {
       (requester.role === Role.EMPLOYEE && screenshot.userId === requester.id);
     if (!permitted) throw new ForbiddenException('You cannot access this screenshot');
 
+    const fileId = screenshot.driveFileId || screenshot.fileKey;
+    const isLocalFile = fileId.startsWith('local:');
+
+    // Attempt to stream the file
     try {
-      const buffer = await this.storage.readFile(
-        screenshot.driveFileId || screenshot.fileKey,
-        screenshot.companyId,
-      );
+      const buffer = await this.storage.readFile(fileId, screenshot.companyId);
       return {
         buffer,
         mimeType: screenshot.mimeType,
         fileName: screenshot.fileName,
       };
-    } catch (error: any) {
-      if (screenshot.driveViewUrl) {
-        return {
-          redirectUrl: screenshot.driveViewUrl,
-          mimeType: screenshot.mimeType,
-          fileName: screenshot.fileName,
-        };
-      }
-      if (screenshot.driveFileId && !screenshot.driveFileId.startsWith('local:')) {
-        return {
-          redirectUrl: `https://drive.google.com/file/d/${screenshot.driveFileId}/view`,
-          mimeType: screenshot.mimeType,
-          fileName: screenshot.fileName,
-        };
-      }
-      throw new NotFoundException('Screenshot image file is missing or deleted from storage');
+    } catch (streamError: any) {
+      // Streaming failed — try redirect fallbacks
+      console.error(`[getFile] Failed to stream screenshot ${screenshotId}: fileId=${fileId}, isLocal=${isLocalFile}, error=${streamError?.message}`);
     }
+
+    // Fallback 1: redirect to stored driveViewUrl
+    if (screenshot.driveViewUrl) {
+      return {
+        redirectUrl: screenshot.driveViewUrl,
+        mimeType: screenshot.mimeType,
+        fileName: screenshot.fileName,
+      };
+    }
+
+    // Fallback 2: construct Google Drive view URL from driveFileId (only if it looks like a Drive ID)
+    if (screenshot.driveFileId && !screenshot.driveFileId.startsWith('local:') && !screenshot.driveFileId.includes('/')) {
+      return {
+        redirectUrl: `https://drive.google.com/file/d/${screenshot.driveFileId}/view`,
+        mimeType: screenshot.mimeType,
+        fileName: screenshot.fileName,
+      };
+    }
+
+    // Fallback 3: construct from fileKey if different from driveFileId
+    if (screenshot.fileKey && screenshot.fileKey !== screenshot.driveFileId && !screenshot.fileKey.startsWith('local:') && !screenshot.fileKey.includes('/')) {
+      return {
+        redirectUrl: `https://drive.google.com/file/d/${screenshot.fileKey}/view`,
+        mimeType: screenshot.mimeType,
+        fileName: screenshot.fileName,
+      };
+    }
+
+    throw new NotFoundException('Screenshot image file is missing or deleted from storage');
+  }
+
+  async debugScreenshot(
+    screenshotId: string,
+    requester: { id: string; companyId: string; role: Role },
+  ) {
+    if (requester.role !== Role.SUPER_ADMIN && requester.role !== Role.COMPANY_ADMIN) {
+      throw new ForbiddenException('Admin only');
+    }
+    const screenshot = await this.prisma.screenshot.findUnique({ where: { id: screenshotId } });
+    if (!screenshot) throw new NotFoundException('Screenshot record not found');
+    if (requester.role === Role.COMPANY_ADMIN && screenshot.companyId !== requester.companyId) {
+      throw new ForbiddenException('Not your company');
+    }
+
+    const fileId = screenshot.driveFileId || screenshot.fileKey;
+    const isLocalFile = fileId.startsWith('local:');
+    const storageRoots = this.storage.getStorageRoots();
+    const pathsTried: { root: string; fullPath: string; exists: boolean }[] = [];
+
+    if (isLocalFile) {
+      const relative = fileId.replace(/^local:/, '');
+      for (const root of storageRoots) {
+        const full = require('path').resolve(root, relative);
+        let exists = false;
+        try {
+          const stat = require('fs').statSync(full);
+          exists = stat.isFile();
+        } catch {}
+        pathsTried.push({ root, fullPath: full, exists });
+      }
+    }
+
+    const conn = await this.prisma.googleDriveConnection.findUnique({
+      where: { companyId: screenshot.companyId },
+    });
+
+    return {
+      screenshotId: screenshot.id,
+      fileKey: screenshot.fileKey,
+      driveFileId: screenshot.driveFileId,
+      driveViewUrl: screenshot.driveViewUrl,
+      isLocalFile,
+      companyId: screenshot.companyId,
+      companyHasDriveConnection: !!conn,
+      cwd: process.cwd(),
+      localRoot: this.storage.getLocalRoot(),
+      storageRoots,
+      pathsTried,
+      envStorageProvider: process.env.STORAGE_PROVIDER || 'local',
+      envLocalStoragePath: process.env.LOCAL_STORAGE_PATH || '(not set)',
+    };
   }
 
   private toResponse<T extends { id: string; fileSize: bigint }>(screenshot: T) {

@@ -12,3 +12,4 @@ storage/
 .DS_Store
 Thumbs.db
 coverage/
+public-site/

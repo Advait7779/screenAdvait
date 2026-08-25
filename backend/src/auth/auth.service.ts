@@ -343,7 +343,7 @@ export class AuthService {
       this.jwtService.signAsync(accessPayload, { expiresIn: '1d' }),
       this.jwtService.signAsync(refreshPayload, {
         secret: this.refreshSecret,
-        expiresIn: '7d',
+        expiresIn: '180d', // Rolling: re-issued on every refresh, so active agents never expire
       }),
     ]);
     return { accessToken, refreshToken };

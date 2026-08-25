@@ -396,14 +396,22 @@ async function refreshAccessToken() {
     apiConnected = true;
     return true;
   } catch (error: any) {
-    apiConnected = false;
     const message = error.response?.data?.message || '';
     if (error.response?.status === 403 && /subscription|license/i.test(message)) {
+      apiConnected = true;
       blockForEntitlement(message);
       return false;
     }
-    clearSession();
-    stopScreenshotEngine();
+    if (error.response?.status === 401) {
+      // Genuine auth rejection (admin revoked, password changed, token invalidated)
+      apiConnected = true;
+      clearSession();
+      stopScreenshotEngine();
+      return false;
+    }
+    // Network error, timeout, DNS failure, 502/503/504 — keep session alive
+    // and let the sync worker retry on the next 10-second cycle.
+    apiConnected = false;
     return false;
   }
 }

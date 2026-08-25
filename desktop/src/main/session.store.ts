@@ -19,8 +19,10 @@ export function initializeSession() {
   if (!cached) return null;
   try {
     const session = deserializeSession(cached.data);
-    const expiresAt = cached.expires_at ? new Date(cached.expires_at).getTime() : 0;
-    if (!session.refreshToken || expiresAt <= Date.now() || isJwtExpired(session.refreshToken)) {
+    // As long as a refresh token is present, restore the session.
+    // The server will be the single authority on token validity —
+    // if truly expired/revoked, it returns 401 and the app cleanly logs out.
+    if (!session.refreshToken) {
       clearSession();
       return null;
     }

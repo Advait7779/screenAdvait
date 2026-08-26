@@ -39,7 +39,10 @@ async function bootstrap() {
       if (
         !origin ||
         allowedOrigins.includes(origin) ||
-        (process.env.NODE_ENV !== 'production' && isLocalPortalOrigin(origin))
+        isLocalPortalOrigin(origin) ||
+        origin.endsWith('.advaitdigital.co.in') ||
+        origin === 'https://screen.advaitdigital.co.in' ||
+        origin === 'https://api-screen.advaitdigital.co.in'
       ) {
         return callback(null, true);
       }

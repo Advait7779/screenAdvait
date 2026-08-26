@@ -10,7 +10,7 @@ async function bootstrap() {
   app.setGlobalPrefix('api');
   app.enableShutdownHooks();
 
-  if (process.env.TRUST_PROXY === 'true') {
+  if (process.env.TRUST_PROXY === 'true' || process.env.TRUST_PROXY === '1') {
     app.getHttpAdapter().getInstance().set('trust proxy', 1);
   }
 
@@ -30,7 +30,7 @@ async function bootstrap() {
   });
   app.use(createRateLimiter());
 
-  const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:3001')
+  const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:3000,http://localhost:3001,https://screen.advaitdigital.co.in')
     .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean);
@@ -59,14 +59,20 @@ async function bootstrap() {
 function createRateLimiter() {
   const buckets = new Map<string, { count: number; resetAt: number }>();
   let requests = 0;
+  const leadLimit = parseInt(process.env.LEAD_RATE_LIMIT_PER_15_MIN || '20', 10);
+  const authLimit = parseInt(process.env.ADMIN_RATE_LIMIT_PER_15_MIN || '15', 10);
+  const apiLimit = parseInt(process.env.API_RATE_LIMIT_PER_15_MIN || '3000', 10);
+
   return (req: any, res: any, next: () => void) => {
     const now = Date.now();
     const path = String(req.originalUrl || req.url || '');
+    const isEnquiry = path.includes('/enquiry');
     const isAuth = path.includes('/auth/login') || path.includes('/auth/portal-login');
     const isUpload = path.includes('/screenshots/upload');
-    const windowMs = isAuth ? 15 * 60_000 : 60_000;
-    const limit = isAuth ? 10 : isUpload ? 12 : 300;
-    const key = `${req.ip || req.socket?.remoteAddress || 'unknown'}:${isAuth ? 'auth' : isUpload ? 'upload' : 'api'}`;
+
+    const windowMs = isEnquiry || isAuth ? 15 * 60_000 : 60_000;
+    const limit = isEnquiry ? leadLimit : isAuth ? authLimit : isUpload ? 12 : Math.ceil(apiLimit / 15);
+    const key = `${req.ip || req.socket?.remoteAddress || 'unknown'}:${isEnquiry ? 'lead' : isAuth ? 'auth' : isUpload ? 'upload' : 'api'}`;
     const bucket = buckets.get(key);
     if (!bucket || bucket.resetAt <= now) {
       buckets.set(key, { count: 1, resetAt: now + windowMs });
@@ -90,7 +96,7 @@ function createRateLimiter() {
 function isLocalPortalOrigin(origin: string) {
   try {
     const url = new URL(origin);
-    const isPortalPort = url.port === '3001';
+    const isPortalPort = url.port === '3000' || url.port === '3001' || url.port === '5173' || url.port === '5174';
     const isLocalHost =
       url.hostname === 'localhost' ||
       url.hostname === '127.0.0.1' ||

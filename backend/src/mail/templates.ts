@@ -216,3 +216,82 @@ export function licenseExpiryWarningEmailTemplate(opts: {
   );
   return { subject, html };
 }
+
+export function enquirySalesNotificationTemplate(opts: {
+  name: string;
+  email: string;
+  company: string;
+  teamSize: string;
+  phone?: string;
+  message?: string;
+  ip?: string;
+  submittedAt?: string;
+}): { subject: string; html: string } {
+  const subject = `🚀 New Enterprise Demo Request: ${opts.company} (${opts.teamSize})`;
+  const html = baseTemplate(
+    `
+    <h2 style="margin:0 0 8px;font-size:22px;font-weight:700;color:#1e293b;">🚀 New Demo Request Received!</h2>
+    <p style="margin:0 0 24px;color:#64748b;font-size:14px;line-height:1.6;">
+      A prospective client has submitted an enterprise demo & enquiry request through the public website.
+    </p>
+
+    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;margin-bottom:24px;">
+      <div style="background:#0f3460;padding:12px 16px;">
+        <span style="color:#ffffff;font-size:13px;font-weight:600;letter-spacing:0.5px;">📋 PROSPECT DETAILS</span>
+      </div>
+      <table width="100%" cellpadding="0" cellspacing="0">
+        ${credentialRow('Full Name', opts.name, true)}
+        ${credentialRow('Work Email', `<a href="mailto:${opts.email}" style="color:#2563eb;text-decoration:none;font-weight:700;">${opts.email}</a>`)}
+        ${credentialRow('Company Name', opts.company, true)}
+        ${credentialRow('Team Size', opts.teamSize, true)}
+        ${credentialRow('Phone Number', opts.phone || 'Not provided')}
+        ${credentialRow('Specific Requirements', opts.message || 'None specified')}
+        ${credentialRow('Submission Time', opts.submittedAt || new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }))}
+        ${opts.ip ? credentialRow('IP Address', opts.ip) : ''}
+      </table>
+    </div>
+
+    <div style="text-align:center;margin-top:24px;">
+      <a href="mailto:${opts.email}?subject=ScreenAdvait%20Enterprise%20Demo%20Follow-up" style="display:inline-block;background:#166534;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:8px;font-size:14px;font-weight:700;">
+        ✉️ Reply to ${opts.name}
+      </a>
+    </div>
+    `,
+    subject,
+  );
+  return { subject, html };
+}
+
+export function enquiryCustomerConfirmationTemplate(opts: {
+  name: string;
+  company: string;
+  teamSize: string;
+}): { subject: string; html: string } {
+  const subject = `Demo Request Received — ScreenAdvait Enterprise`;
+  const html = baseTemplate(
+    `
+    <h2 style="margin:0 0 8px;font-size:22px;font-weight:700;color:#1e293b;">Thank you, ${opts.name}! 👋</h2>
+    <p style="margin:0 0 20px;color:#64748b;font-size:14px;line-height:1.6;">
+      We have received your demo request for <strong>${opts.company}</strong> (${opts.teamSize}). 
+      Our enterprise solutions team is reviewing your requirements and will reach out to you within 24 hours.
+    </p>
+
+    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:20px;margin-bottom:24px;">
+      <p style="margin:0 0 12px;font-size:14px;font-weight:600;color:#166534;">🌟 What to Expect in Your Demo</p>
+      <ul style="margin:0;padding-left:20px;color:#15803d;font-size:13px;line-height:1.8;">
+        <li>Full guided tour of Company Admin and SuperAdmin portals</li>
+        <li>Review of multi-monitor silent desktop capture & interval controls</li>
+        <li>Custom ROI calculation tailored to your team size (${opts.teamSize})</li>
+        <li>Complimentary 14-day enterprise pilot trial setup</li>
+      </ul>
+    </div>
+
+    <p style="margin:0;color:#64748b;font-size:13px;line-height:1.6;">
+      If you need immediate assistance, feel free to reply directly to this email.
+    </p>
+    `,
+    subject,
+  );
+  return { subject, html };
+}
+

@@ -7,6 +7,8 @@ import {
   passwordResetEmailTemplate,
   licenseReactivatedEmailTemplate,
   licenseExpiryWarningEmailTemplate,
+  enquirySalesNotificationTemplate,
+  enquiryCustomerConfirmationTemplate,
 } from './templates.js';
 
 @Injectable()
@@ -14,6 +16,7 @@ export class MailService {
   private readonly logger = new Logger(MailService.name);
   private transporter: Transporter | null = null;
   private readonly fromAddress: string;
+  private readonly notifyEmail: string;
   private readonly enabled: boolean;
 
   constructor(private readonly config: ConfigService) {
@@ -21,17 +24,31 @@ export class MailService {
     const user = config.get<string>('SMTP_USER');
     const pass = config.get<string>('SMTP_PASS');
     const port = parseInt(config.get<string>('SMTP_PORT') || '587', 10);
-    this.fromAddress = config.get<string>('SMTP_FROM') || `"ScreenAdvait Platform" <${user}>`;
+    const secureSetting = config.get<string | boolean>('SMTP_SECURE');
+    const secure = secureSetting === 'true' || secureSetting === true || port === 465;
+
+    const maxConnections = parseInt(config.get<string>('SMTP_MAX_CONNECTIONS') || '3', 10);
+    const maxMessages = parseInt(config.get<string>('SMTP_MAX_MESSAGES_PER_CONNECTION') || '100', 10);
+
+    const fromConfig = config.get<string>('SMTP_FROM');
+    this.fromAddress = fromConfig
+      ? fromConfig.includes('<') ? fromConfig : `"ScreenAdvait Enterprise" <${fromConfig}>`
+      : `"ScreenAdvait Enterprise" <${user}>`;
+
+    this.notifyEmail = config.get<string>('NOTIFY_EMAIL') || 'sales@advaitteleservices.com';
 
     if (host && user && pass) {
       this.transporter = nodemailer.createTransport({
         host,
         port,
-        secure: port === 465,
+        secure,
         auth: { user, pass },
-      });
+        pool: maxConnections > 1,
+        maxConnections,
+        maxMessages,
+      } as any);
       this.enabled = true;
-      this.logger.log(`Mail service enabled — SMTP: ${host}:${port} as ${user}`);
+      this.logger.log(`Mail service enabled — SMTP: ${host}:${port} (secure: ${secure}) as ${user} | Notify: ${this.notifyEmail}`);
     } else {
       this.enabled = false;
       this.logger.warn(
@@ -40,10 +57,10 @@ export class MailService {
     }
   }
 
-  private async send(to: string, subject: string, html: string): Promise<void> {
+  private async send(to: string, subject: string, html: string): Promise<boolean> {
     if (!this.enabled || !this.transporter) {
       this.logger.debug(`[Mail disabled] Would have sent "${subject}" to ${to}`);
-      return;
+      return false;
     }
     try {
       const info = await this.transporter.sendMail({
@@ -53,9 +70,11 @@ export class MailService {
         html,
       });
       this.logger.log(`Email sent to ${to} — subject: "${subject}" — messageId: ${info.messageId}`);
+      return true;
     } catch (err: any) {
       // Never crash the app on email failure — just log it
       this.logger.error(`Failed to send email to ${to}: ${err.message}`);
+      return false;
     }
   }
 
@@ -105,5 +124,34 @@ export class MailService {
   }): Promise<void> {
     const { subject, html } = licenseExpiryWarningEmailTemplate(opts);
     await this.send(opts.to, subject, html);
+  }
+
+  async sendEnquiryLead(opts: {
+    name: string;
+    email: string;
+    company: string;
+    teamSize: string;
+    phone?: string;
+    message?: string;
+    ip?: string;
+  }): Promise<{ salesNotified: boolean; confirmationSent: boolean }> {
+    const submittedAt = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) + ' IST';
+
+    // 1. Send sales lead alert to sales team
+    const salesNotification = enquirySalesNotificationTemplate({
+      ...opts,
+      submittedAt,
+    });
+    const salesNotified = await this.send(this.notifyEmail, salesNotification.subject, salesNotification.html);
+
+    // 2. Send confirmation to prospective customer
+    const confirmation = enquiryCustomerConfirmationTemplate({
+      name: opts.name,
+      company: opts.company,
+      teamSize: opts.teamSize,
+    });
+    const confirmationSent = await this.send(opts.email, confirmation.subject, confirmation.html);
+
+    return { salesNotified, confirmationSent };
   }
 }

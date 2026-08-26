@@ -11,6 +11,7 @@ import { SubscriptionModule } from './subscriptions/subscription.module.js';
 import { CompanyAdminModule } from './company-admin/company-admin.module.js';
 import { validateEnvironment } from './config/validate-env.js';
 import { MailModule } from './mail/mail.module.js';
+import { PaymentModule } from './payments/payment.module.js';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { MailModule } from './mail/mail.module.js';
     PrismaModule,
     EntitlementModule,
     MailModule,
+    PaymentModule,
     AuthModule,
     LicenseModule,
     ScreenshotModule,

@@ -1,0 +1,118 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Base ─── */
+@layer base {
+  html { scroll-behavior: smooth; }
+
+  :root, body, #root, *, button, input, select, textarea {
+    font-family: 'Montserrat', system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important;
+  }
+
+  body {
+    background-color: #f0f2f5;
+    color: #111827;
+    min-width: 320px;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    color: #111827;
+    letter-spacing: -0.02em;
+    font-weight: 700;
+  }
+}
+
+/* ─── Custom Scrollbar ─── */
+::-webkit-scrollbar { width: 7px; height: 7px; }
+::-webkit-scrollbar-track { background: #f0f2f5; }
+::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #15803d; }
+
+/* ─── Exact portal sidebar gradient ─── */
+.sidebar-bg {
+  background: linear-gradient(180deg, #1a2e24 0%, #2d3748 100%);
+}
+.sidebar-bg-alt {
+  background: linear-gradient(180deg, #1e2d1e 0%, #2d3748 100%);
+}
+
+/* ─── Primary green CTA button — exact match to portal buttons ─── */
+.btn-primary {
+  background: linear-gradient(135deg, #15803d, #166534);
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 0.875rem;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 1px 3px rgba(21,128,61,0.3), 0 1px 2px rgba(21,128,61,0.2);
+}
+.btn-primary:hover {
+  background: linear-gradient(135deg, #16a34a, #15803d);
+  box-shadow: 0 4px 14px -2px rgba(21,128,61,0.45);
+  transform: translateY(-1px);
+}
+.btn-primary:active { transform: translateY(0); box-shadow: 0 1px 3px rgba(21,128,61,0.2); }
+
+/* ─── Secondary / outline button ─── */
+.btn-secondary {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  color: #374151;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+}
+.btn-secondary:hover {
+  background: #f9fafb;
+  border-color: #15803d;
+  color: #15803d;
+  transform: translateY(-1px);
+}
+
+/* ─── Green outline button ─── */
+.btn-green-outline {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #15803d;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+.btn-green-outline:hover {
+  background: #dcfce7;
+  border-color: #86efac;
+  transform: translateY(-1px);
+}
+
+/* ─── White card — exact portal card style ─── */
+.portal-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.07), 0 1px 2px -1px rgba(0,0,0,0.06);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.portal-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px -4px rgba(0,0,0,0.12), 0 2px 6px -2px rgba(0,0,0,0.06);
+  border-color: #bbf7d0;
+}
+
+/* ─── Green badge pill — exact portal badge style ─── */
+.badge-green {
+  background-color: #dcfce7;
+  color: #14532d;
+  border: 1px solid #bbf7d0;
+}
+
+/* ─── Pulse animation utility ─── */
+@keyframes pingSlow {
+  0%   { transform: scale(1);   opacity: 0.8; }
+  50%  { transform: scale(1.6); opacity: 0;   }
+  100% { transform: scale(1);   opacity: 0;   }
+}
+.animate-ping-slow {
+  animation: pingSlow 2.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+}

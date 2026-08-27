@@ -36,19 +36,15 @@ WORKDIR /app
 
 RUN apt-get update -y && apt-get install -y openssl ca-certificates && rm -rf /var/lib/apt/lists/*
 
-RUN groupadd --system --gid 10001 screenadvait \
-  && useradd --system --uid 10001 --gid screenadvait --create-home screenadvait
-
 # Copy production node_modules, built output, and prisma
-COPY --from=builder --chown=screenadvait:screenadvait /app/node_modules ./node_modules
-COPY --from=builder --chown=screenadvait:screenadvait /app/packages ./packages
-COPY --from=builder --chown=screenadvait:screenadvait /app/dist ./dist
-COPY --from=builder --chown=screenadvait:screenadvait /app/prisma ./prisma
-COPY --from=builder --chown=screenadvait:screenadvait /app/package.json ./
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/packages ./packages
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/package.json ./
 
-RUN mkdir -p /app/storage /data/screenshots && chown -R screenadvait:screenadvait /app/storage /data/screenshots
+RUN mkdir -p /app/storage /data/screenshots && chmod -R 777 /app/storage /data/screenshots
 
-USER screenadvait
 EXPOSE 5008
 
-CMD ["sh", "-c", "npx prisma migrate deploy --schema prisma/schema.prisma && node dist/src/main.js"]
+CMD ["sh", "-c", "mkdir -p /app/storage && chmod 777 /app/storage 2>/dev/null || true; npx prisma migrate deploy --schema prisma/schema.prisma && node dist/src/main.js"]

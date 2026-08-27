@@ -9,6 +9,7 @@
     "dev": "pnpm --recursive --parallel run dev",
     "dev:admin": "pnpm --filter @screenadvait/admin-web dev",
     "dev:company": "pnpm --filter @screenadvait/customer-web dev",
+    "dev:public": "pnpm --filter @screenadvait/public-site dev",
     "lint": "pnpm --recursive --if-present run lint",
     "typecheck": "pnpm --recursive run typecheck"
   },

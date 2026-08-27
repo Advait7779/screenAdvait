@@ -40,13 +40,11 @@ export function Navbar({ onOpenDemo }: NavbarProps) {
           <div className="hidden sm:flex items-center gap-2.5">
             {/* Direct Portal Login Link */}
             <a
-              href="https://screen.advaitdigital.co.in/"
-              target="_blank"
-              rel="noreferrer"
+              href="/portal/"
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50 hover:border-green-300 hover:text-green-700 transition-all shadow-sm"
             >
               <Monitor className="w-3.5 h-3.5 text-green-600" />
-              <span>Portal Logins</span>
+              <span>Portal Login</span>
             </a>
 
             <button
@@ -73,16 +71,24 @@ export function Navbar({ onOpenDemo }: NavbarProps) {
         <div className="lg:hidden bg-white border-t border-gray-100 px-4 pt-3 pb-5 shadow-sm">
           <div className="space-y-2">
             <a
-              href="https://screen.advaitdigital.co.in/"
-              target="_blank"
-              rel="noreferrer"
+              href="/portal/"
               className="flex items-center justify-between px-3 py-2.5 text-xs font-semibold text-gray-700 bg-gray-50 rounded-lg border border-gray-200"
             >
               <span className="flex items-center gap-2">
                 <Monitor className="w-4 h-4 text-green-600" />
-                Portal Logins (SuperAdmin & Company Admin)
+                Customer Admin Portal
               </span>
-              <ExternalLink className="w-3.5 h-3.5 text-gray-400" />
+              <ArrowRight className="w-3.5 h-3.5 text-gray-400" />
+            </a>
+            <a
+              href="/admin/"
+              className="flex items-center justify-between px-3 py-2.5 text-xs font-semibold text-gray-700 bg-gray-50 rounded-lg border border-gray-200"
+            >
+              <span className="flex items-center gap-2">
+                <Monitor className="w-4 h-4 text-green-700" />
+                SuperAdmin Portal
+              </span>
+              <ArrowRight className="w-3.5 h-3.5 text-gray-400" />
             </a>
             <button
               onClick={() => { setMobileMenuOpen(false); onOpenDemo('Mobile full'); }}

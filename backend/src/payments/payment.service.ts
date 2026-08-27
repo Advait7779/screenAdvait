@@ -296,7 +296,7 @@ export class PaymentService {
         ? 'Subscription extended successfully'
         : 'Enterprise account provisioned successfully. Check your email for login credentials.',
       companyId,
-      portalUrl: 'https://screen.advaitdigital.co.in/',
+      portalUrl: 'https://screen.advaitdigital.co.in/portal/',
       username,
       temporaryPassword: isExisting ? undefined : temporaryPassword,
     };

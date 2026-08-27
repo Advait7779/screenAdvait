@@ -39,9 +39,7 @@ export function Footer({ onOpenDemo }: FooterProps) {
               <ArrowRight className="w-4 h-4" />
             </button>
             <a
-              href="https://screen.advaitdigital.co.in/"
-              target="_blank"
-              rel="noreferrer"
+              href="/portal/"
               className="w-full sm:w-auto px-5 py-3 rounded-xl text-xs sm:text-sm font-semibold bg-white/10 border border-white/30 text-white hover:bg-white/20 transition-all flex items-center justify-center gap-2"
             >
               <Building2 className="w-4 h-4 text-green-300" />
@@ -71,18 +69,14 @@ export function Footer({ onOpenDemo }: FooterProps) {
               </p>
               <div className="flex flex-col gap-1.5 mt-4">
                 <a
-                  href="https://screen.advaitdigital.co.in/"
-                  target="_blank"
-                  rel="noreferrer"
+                  href="/portal/"
                   className="flex items-center gap-2 text-xs font-semibold text-gray-600 hover:text-green-700 transition-colors"
                 >
                   <Building2 className="w-3.5 h-3.5 text-green-600" />
                   Company Admin Portal
                 </a>
                 <a
-                  href="https://screen.advaitdigital.co.in/"
-                  target="_blank"
-                  rel="noreferrer"
+                  href="/admin/"
                   className="flex items-center gap-2 text-xs font-semibold text-gray-600 hover:text-green-700 transition-colors"
                 >
                   <ShieldCheck className="w-3.5 h-3.5 text-green-700" />
@@ -114,9 +108,7 @@ export function Footer({ onOpenDemo }: FooterProps) {
               <ul className="space-y-2.5 text-xs sm:text-sm text-gray-500">
                 <li>
                   <a
-                    href="https://screen.advaitdigital.co.in/"
-                    target="_blank"
-                    rel="noreferrer"
+                    href="/portal/"
                     className="hover:text-green-700 transition-colors"
                   >
                     Company Admin
@@ -124,9 +116,7 @@ export function Footer({ onOpenDemo }: FooterProps) {
                 </li>
                 <li>
                   <a
-                    href="https://screen.advaitdigital.co.in/"
-                    target="_blank"
-                    rel="noreferrer"
+                    href="/admin/"
                     className="hover:text-green-700 transition-colors"
                   >
                     SuperAdmin Console
@@ -183,9 +173,7 @@ export function Footer({ onOpenDemo }: FooterProps) {
             </div>
             <div className="flex flex-wrap items-center justify-center sm:justify-end gap-4 sm:gap-6">
               <a
-                href="https://screen.advaitdigital.co.in/"
-                target="_blank"
-                rel="noreferrer"
+                href="/portal/"
                 className="hover:text-green-700 transition-colors"
               >
                 Sign In to Portal

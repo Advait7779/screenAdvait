@@ -1,11 +1,12 @@
 {
-  "name": "screenadvait-landing-page",
-  "private": true,
+  "name": "@screenadvait/public-site",
   "version": "1.0.0",
+  "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
+    "dev": "vite --port 3000",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit --incremental false",
     "preview": "vite preview"
   },
   "dependencies": {

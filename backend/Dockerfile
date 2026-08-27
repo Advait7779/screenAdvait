@@ -46,7 +46,7 @@ COPY --from=builder --chown=screenadvait:screenadvait /app/dist ./dist
 COPY --from=builder --chown=screenadvait:screenadvait /app/prisma ./prisma
 COPY --from=builder --chown=screenadvait:screenadvait /app/package.json ./
 
-RUN mkdir -p /data/screenshots && chown -R screenadvait:screenadvait /data/screenshots
+RUN mkdir -p /app/storage /data/screenshots && chown -R screenadvait:screenadvait /app/storage /data/screenshots
 
 USER screenadvait
 EXPOSE 5008

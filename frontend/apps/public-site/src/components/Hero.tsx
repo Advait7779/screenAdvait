@@ -68,7 +68,7 @@ export function Hero({ onOpenDemo }: HeroProps) {
               {[
                 'Silent Background Agent (<15MB RAM)',
                 'Hardware-Locked License Security',
-                'Custom 1m – 15m Capture Frequency',
+                'Custom 1m – 60m Capture Frequency',
                 'Multi-Screen Dual Display Capture',
               ].map((t) => (
                 <div key={t} className="flex items-start gap-1.5">

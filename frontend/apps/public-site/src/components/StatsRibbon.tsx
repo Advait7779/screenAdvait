@@ -9,7 +9,7 @@ import {
 export function StatsRibbon() {
   const stats = [
     {
-      value: '1m – 15m',
+      value: '1m – 60m',
       label: 'Granular Capture Intervals',
       subtext: 'Dynamic frequency with 1-click remote pause & resume',
       icon: SvgIntervalSliders,

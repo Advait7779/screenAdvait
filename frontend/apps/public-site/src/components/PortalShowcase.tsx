@@ -26,7 +26,7 @@ export function PortalShowcase({ onOpenDemo }: PortalShowcaseProps) {
       description: 'The Company Admin Portal gives department leads immediate visibility into team operations without micromanagement friction.',
       highlights: [
         { title: 'Automated Multi-Screen Captures', desc: 'Full-resolution snapshots supporting multi-monitor enterprise setups.' },
-        { title: 'Granular Interval Engine (1m – 15m)', desc: 'Customizable capture intervals with 1-click global or per-team pause.' },
+        { title: 'Granular Interval Engine (1m – 60m)', desc: 'Customizable capture intervals with 1-click global or per-team pause.' },
         { title: 'Live Device Heartbeat Matrix', desc: 'Instant online, idle, or offline device status indicators.' },
         { title: 'Day-by-Day Screenshot Archive', desc: 'Grouped timeline hierarchy by date and employee with high-res zoom inspection.' },
       ],

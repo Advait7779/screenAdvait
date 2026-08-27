@@ -28,8 +28,8 @@ export function ScreenshotGallery() {
     },
     {
       id: 'settings', title: 'Dynamic Capture Intervals & Stealth Controls', category: 'Capture Engine', subtitle: 'Flexible Governance & Policy Settings', mockType: 'capture-settings',
-      description: 'Easily adjust capture frequencies from 1–15 minute intervals, toggle emergency pause company-wide, and manage stealth mode preferences.',
-      highlights: ['1m, 5m, 10m, and 15m preset selectors', '1-click company-wide capture pause and resume', 'Stealth mode and background daemon behavior rules', 'Instant remote sync with workstation agents'],
+      description: 'Easily adjust capture frequencies from 1–60 minute intervals, toggle emergency pause company-wide, and manage stealth mode preferences.',
+      highlights: ['1m, 5m, 10m, 15m, 30m, and 60m preset selectors', '1-click company-wide capture pause and resume', 'Stealth mode and background daemon behavior rules', 'Instant remote sync with workstation agents'],
     },
     {
       id: 'archive', title: 'Organization Archive & Custom Pagination', category: 'Archive & Filter', subtitle: 'Search, Filter & Custom Page Controls', mockType: 'archive-pagination',

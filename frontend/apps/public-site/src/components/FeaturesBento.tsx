@@ -20,7 +20,7 @@ export function FeaturesBento({ onOpenDemo }: FeaturesBentoProps) {
     {
       title: 'Automated Multi-Screen Capture & Interval Engine',
       category: 'Capture Engine',
-      description: 'Continuously captures full-resolution desktop displays across single, dual, and ultrawide 4K monitors. Adjust capture frequency on the fly (1m, 5m, 10m, 15m) or pause captures company-wide with instant agent synchronization.',
+      description: 'Continuously captures full-resolution desktop displays across single, dual, and ultrawide 4K monitors. Adjust capture frequency on the fly (1m to 60m) or pause captures company-wide with instant agent synchronization.',
       icon: SvgCaptureCamera,
       badge: 'Multi-Monitor 4K',
       badgeClass: 'bg-green-50 text-green-700 border-green-200',
@@ -102,7 +102,7 @@ export function FeaturesBento({ onOpenDemo }: FeaturesBentoProps) {
             Complete Screenshot Monitoring & License Control
           </h2>
           <p className="mt-3 sm:mt-4 text-sm sm:text-base lg:text-lg text-gray-500">
-            From automated multi-screen captures and hardware-bound license keys to custom 1m–15m interval controls and searchable organization archives.
+            From automated multi-screen captures and hardware-bound license keys to custom 1m–60m interval controls and searchable organization archives.
           </p>
         </div>
 

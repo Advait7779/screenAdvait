@@ -269,14 +269,19 @@ export class ScreenshotService implements OnModuleInit {
         screenshotCount: bigint;
         employeeCount: bigint;
       }[]>`
-        SELECT ((s."capturedAt" AT TIME ZONE 'UTC') AT TIME ZONE ${timeZone})::date::text AS key,
-               MAX(s."capturedAt") AS "capturedAt",
+        WITH filtered AS (
+          SELECT s."capturedAt", s."userId",
+                 ((s."capturedAt" AT TIME ZONE 'UTC') AT TIME ZONE ${timeZone})::date AS local_day
+          FROM screenshots s JOIN users u ON u.id = s."userId"
+          WHERE s."companyId" = ${companyId} ${filter}
+        )
+        SELECT local_day::text AS key,
+               MAX("capturedAt") AS "capturedAt",
                COUNT(*) AS "screenshotCount",
-               COUNT(DISTINCT s."userId") AS "employeeCount"
-        FROM screenshots s JOIN users u ON u.id = s."userId"
-        WHERE s."companyId" = ${companyId} ${filter}
-        GROUP BY ((s."capturedAt" AT TIME ZONE 'UTC') AT TIME ZONE ${timeZone})::date
-        ORDER BY ((s."capturedAt" AT TIME ZONE 'UTC') AT TIME ZONE ${timeZone})::date DESC
+               COUNT(DISTINCT "userId") AS "employeeCount"
+        FROM filtered
+        GROUP BY local_day
+        ORDER BY local_day DESC
         LIMIT ${pageSize} OFFSET ${(page - 1) * pageSize}
       `,
     ]);

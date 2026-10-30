@@ -94,6 +94,9 @@ test('screenshot day listing returns numeric counts without exposing other compa
     assert.match(query.sql, /AT TIME ZONE 'UTC'/);
     assert.ok(query.values.includes('company-1'));
   }
+  const groupedQuery = queries.find(({ sql }) => sql.includes('GROUP BY'));
+  assert.match(groupedQuery.sql, /GROUP BY local_day/);
+  assert.equal((groupedQuery.sql.match(/AT TIME ZONE 'UTC'/g) || []).length, 1);
 });
 
 test('searched screenshot pages stay within the company and return a continuation cursor', async () => {

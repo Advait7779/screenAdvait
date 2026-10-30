@@ -124,7 +124,7 @@ export function Footer({ onOpenDemo }: FooterProps) {
                 </li>
                 <li>
                   <a
-                    href="/download/ScreenAdvait-Desktop-Setup.zip"
+                    href="/download/ScreenAdvait-Desktop-Setup.zip?v=1.4.1"
                     className="hover:text-green-700 transition-colors"
                   >
                     Desktop Client (.exe)

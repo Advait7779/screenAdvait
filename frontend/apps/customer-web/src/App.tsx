@@ -15,7 +15,7 @@ const API_URL =
   `${window.location.origin}/api/v1`;
 const DESKTOP_DOWNLOAD_URL =
   import.meta.env.VITE_DESKTOP_DOWNLOAD_URL ||
-  '/download/ScreenAdvait-Desktop-Setup.zip';
+  '/download/ScreenAdvait-Desktop-Setup.zip?v=1.4.1';
 
 function apiErrorMessage(error: any, fallback: string) {
   const details = error.response?.data?.errors;

@@ -2,6 +2,20 @@
 @tailwind components;
 @tailwind utilities;
 
+.login-input,
+.login-input:focus {
+  background-color: #fff !important;
+  color-scheme: light;
+}
+
+.login-input:-webkit-autofill,
+.login-input:-webkit-autofill:hover,
+.login-input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px #fff inset !important;
+  -webkit-text-fill-color: #111827 !important;
+  caret-color: #111827;
+}
+
 @layer base {
   html {
     scroll-behavior: smooth;

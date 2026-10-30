@@ -96,6 +96,69 @@ export class CompanyAdminService {
     };
   }
 
+  async summary(companyId: string) {
+    const [subscription, employees, screenshots, company] = await Promise.all([
+      this.entitlements.getCurrentSubscription(companyId),
+      this.prisma.user.count({ where: { companyId, role: Role.EMPLOYEE } }),
+      this.prisma.screenshot.count({ where: { companyId } }),
+      this.prisma.company.findUnique({
+        where: { id: companyId },
+        select: { captureIntervalSeconds: true, isCapturePaused: true },
+      }),
+    ]);
+    return {
+      subscription: subscription ? { ...subscription, maxStorageMb: Number(subscription.maxStorageMb) } : null,
+      usage: {
+        employees,
+        screenshots,
+      },
+      captureSettings: {
+        captureIntervalSeconds: company?.captureIntervalSeconds ?? 900,
+        isCapturePaused: company?.isCapturePaused ?? false,
+      },
+    };
+  }
+
+  async getEmployeePage(companyId: string, page: number, pageSize: number) {
+    const where = { companyId, role: Role.EMPLOYEE };
+    const [total, items] = await Promise.all([
+      this.prisma.user.count({ where }),
+      this.prisma.user.findMany({
+        where,
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        select: {
+          id: true,
+          username: true,
+          email: true,
+          fullName: true,
+          isActive: true,
+          createdAt: true,
+          licenses: {
+            select: {
+              id: true,
+              key: true,
+              status: true,
+              maxDevices: true,
+              currentDevices: true,
+              expiryDate: true,
+              subscriptionId: true,
+              devices: {
+                select: { id: true, lastSeenAt: true, computerName: true, os: true },
+                orderBy: [{ lastSeenAt: 'desc' }, { id: 'desc' }],
+                take: 1,
+              },
+            },
+            orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+            take: 1,
+          },
+        },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      }),
+    ]);
+    return { items, total, page, pageSize };
+  }
+
   async createEmployee(
     companyId: string,
     adminUserId: string,

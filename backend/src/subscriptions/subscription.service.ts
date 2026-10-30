@@ -237,6 +237,58 @@ export class SubscriptionService {
     );
   }
 
+  async getPage(page: number, pageSize: number) {
+    const [total, subscriptions] = await Promise.all([
+      this.prisma.subscription.count(),
+      this.prisma.subscription.findMany({
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        select: {
+          id: true,
+          companyId: true,
+          plan: true,
+          status: true,
+          startDate: true,
+          endDate: true,
+          maxEmployees: true,
+          maxDevices: true,
+          company: { select: { id: true, name: true, code: true } },
+        },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      }),
+    ]);
+    const companyIds = [...new Set(subscriptions.map((item) => item.companyId))];
+    const subscriptionIds = subscriptions.map((item) => item.id);
+    const [employees, allocations] = companyIds.length
+      ? await Promise.all([
+          this.prisma.user.groupBy({
+            by: ['companyId'],
+            where: { companyId: { in: companyIds }, role: Role.EMPLOYEE },
+            _count: { _all: true },
+          }),
+          this.prisma.license.groupBy({
+            by: ['subscriptionId'],
+            where: { subscriptionId: { in: subscriptionIds } },
+            _sum: { maxDevices: true },
+          }),
+        ])
+      : [[], []];
+    const employeeCounts = new Map(employees.map((item) => [item.companyId, item._count._all]));
+    const allocatedSlots = new Map(allocations.map((item) => [item.subscriptionId, item._sum.maxDevices || 0]));
+    return {
+      items: subscriptions.map((item) => ({
+        ...item,
+        usage: {
+          employees: employeeCounts.get(item.companyId) || 0,
+          allocatedDeviceSlots: allocatedSlots.get(item.id) || 0,
+        },
+      })),
+      total,
+      page,
+      pageSize,
+    };
+  }
+
   private expiryForPlan(start: Date, plan: LicensePlan, customDays?: number) {
     const planDays: Record<LicensePlan, number> = {
       TRIAL: 14,

@@ -326,4 +326,26 @@ export class LicenseService {
     });
     return licenses;
   }
+
+  async getLicensePage(page: number, pageSize: number) {
+    const [total, items] = await Promise.all([
+      this.prisma.license.count(),
+      this.prisma.license.findMany({
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        select: {
+          id: true,
+          key: true,
+          status: true,
+          maxDevices: true,
+          currentDevices: true,
+          company: { select: { name: true } },
+          subscription: { select: { status: true } },
+          user: { select: { username: true } },
+        },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      }),
+    ]);
+    return { items, total, page, pageSize };
+  }
 }

@@ -18,6 +18,16 @@ export class CompanyController {
     return this.companyService.getAllCompanies();
   }
 
+  @Get('options')
+  getCompanyOptions() {
+    return this.companyService.getCompanyOptions();
+  }
+
+  @Get('summary')
+  getPlatformSummary() {
+    return this.companyService.getPlatformSummary();
+  }
+
   @Post()
   async createCompany(
     @Body(new ZodValidationPipe(CreateCompanySchema)) body: CreateCompanyInput,

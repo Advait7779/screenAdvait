@@ -13,6 +13,7 @@ import {
   PlayCircle,
   Plus,
   RefreshCw,
+  RotateCcw,
   ShieldCheck,
   Users,
   LogOut,
@@ -26,6 +27,7 @@ import {
 import axios from 'axios';
 import { CustomerDashboard } from './CustomerDashboard';
 import { ConfirmDialog } from './ConfirmDialog';
+import { ActionIconButton } from './ActionIconButton';
 import { ToastContainer, ToastMessage } from './ToastContainer';
 
 const API_URL =
@@ -163,6 +165,15 @@ function KpiIconDevices() {
 
 type TabType = 'subscription_form' | 'subscriptions_table' | 'licenses_table';
 
+type PendingAction = {
+  title: string;
+  description: string;
+  confirmLabel: string;
+  tone: 'danger' | 'warning' | 'success' | 'info';
+  icon: React.ReactNode;
+  run: () => Promise<void>;
+};
+
 export function App() {
   const [token, setToken] = useState<string | null>(sessionStorage.getItem('portal_token'));
   const [session, setSession] = useState<any>(restoredSession());
@@ -174,11 +185,15 @@ export function App() {
   const [companies, setCompanies] = useState<any[]>([]);
   const [subscriptions, setSubscriptions] = useState<any[]>([]);
   const [licenses, setLicenses] = useState<any[]>([]);
+  const [platformSummary, setPlatformSummary] = useState({ companies: 0, activeSubscriptions: 0, licenses: 0, activatedDevices: 0 });
+  const [totalSubscriptions, setTotalSubscriptions] = useState(0);
+  const [totalLicenses, setTotalLicenses] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [msg, setMsg] = useState('');
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [logoutConfirmationOpen, setLogoutConfirmationOpen] = useState(false);
+  const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const [newCompanyCredentials, setNewCompanyCredentials] = useState<{
     companyName: string;
     username: string;
@@ -208,6 +223,7 @@ export function App() {
 
   // Delete Company State
   const [deleteTargetCompany, setDeleteTargetCompany] = useState<any>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   // Edit Company & Subscription State
   const [editTargetCompany, setEditTargetCompany] = useState<any>(null);
@@ -255,34 +271,65 @@ export function App() {
   };
 
   useEffect(() => {
-    if (token && session?.user?.role === 'SUPER_ADMIN') void fetchAdminData();
+    if (token && session?.user?.role === 'SUPER_ADMIN') void fetchAdminSummary();
   }, [token, session?.user?.role]);
 
-  const fetchAdminData = async (isManual = false) => {
-    setLoading(true);
-    setError('');
+  useEffect(() => {
+    if (token && session?.user?.role === 'SUPER_ADMIN') void fetchActiveList();
+  }, [token, session?.user?.role, activeTab, subPage, subPageSize, licPage, licPageSize]);
+
+  const fetchAdminSummary = async () => {
     try {
-      const [companyRes, subscriptionRes, licenseRes] = await Promise.all([
-        axios.get(`${API_URL}/companies`, auth(token)),
-        axios.get(`${API_URL}/subscriptions`, auth(token)),
-        axios.get(`${API_URL}/licenses`, auth(token)),
+      const [companyRes, summaryRes] = await Promise.all([
+        axios.get(`${API_URL}/companies/options`, auth(token)),
+        axios.get(`${API_URL}/companies/summary`, auth(token)),
       ]);
       setCompanies(companyRes.data);
-      setSubscriptions(subscriptionRes.data);
-      setLicenses(licenseRes.data);
-      setForm((current) => ({
-        ...current,
-        companyName: current.companyName || companyRes.data[0]?.name || '',
-      }));
-      if (isManual) addToast('Platform data refreshed.', 'info');
+      setPlatformSummary(summaryRes.data);
+      setForm((current) => ({ ...current, companyName: current.companyName || companyRes.data[0]?.name || '' }));
     } catch (err: any) {
-      const message = apiErrorMessage(err, 'Failed to load platform data');
+      const message = apiErrorMessage(err, 'Failed to load platform summary');
+      setError(message);
+      addToast(message, 'error');
+      if (err.response?.status === 401 || err.response?.status === 403) performLogout();
+    }
+  };
+
+  const fetchActiveList = async () => {
+    if (activeTab === 'subscription_form') return;
+    setLoading(true);
+    try {
+      if (activeTab === 'subscriptions_table') {
+        const response = await axios.get(`${API_URL}/subscriptions`, {
+          ...auth(token), params: { page: subPage, pageSize: subPageSize },
+        });
+        setSubscriptions(response.data.items);
+        setTotalSubscriptions(response.data.total);
+        const lastPage = Math.max(1, Math.ceil(response.data.total / subPageSize));
+        if (subPage > lastPage) setSubPage(lastPage);
+      } else {
+        const response = await axios.get(`${API_URL}/licenses`, {
+          ...auth(token), params: { page: licPage, pageSize: licPageSize },
+        });
+        setLicenses(response.data.items);
+        setTotalLicenses(response.data.total);
+        const lastPage = Math.max(1, Math.ceil(response.data.total / licPageSize));
+        if (licPage > lastPage) setLicPage(lastPage);
+      }
+    } catch (err: any) {
+      const message = apiErrorMessage(err, 'Failed to load platform records');
       setError(message);
       addToast(message, 'error');
       if (err.response?.status === 401 || err.response?.status === 403) performLogout();
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchAdminData = async (isManual = false) => {
+    setError('');
+    await Promise.all([fetchAdminSummary(), fetchActiveList()]);
+    if (isManual) addToast('Platform data refreshed.', 'info');
   };
 
   const handleLogin = async (event: React.FormEvent) => {
@@ -394,8 +441,7 @@ export function App() {
     });
   };
 
-  const handleUpdateCompanySubscription = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleUpdateCompanySubscription = async () => {
     if (!editTargetCompany) return;
     setEditLoading(true);
     try {
@@ -421,6 +467,17 @@ export function App() {
     }
   };
 
+  const requestUpdateCompanySubscription = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!editTargetCompany) return;
+    setPendingAction({
+      title: `Save changes to ${editTargetCompany.company?.name || editForm.companyName}?`,
+      description: 'The company name, subscription plan, limits, and expiry will be updated with the values in this form.',
+      confirmLabel: 'Save changes', tone: 'info', icon: <Pencil className="h-4 w-4" />,
+      run: handleUpdateCompanySubscription,
+    });
+  };
+
   const renew = async (id: string) => {
     try {
       await axios.post(`${API_URL}/subscriptions/${id}/renew`, { days: 30 }, auth(token));
@@ -434,8 +491,7 @@ export function App() {
     }
   };
 
-  const handleResetCompanyAdminPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleResetCompanyAdminPassword = async () => {
     if (!resetPasswordTargetCompany) return;
     setResetLoading(true);
     try {
@@ -455,6 +511,17 @@ export function App() {
     } finally {
       setResetLoading(false);
     }
+  };
+
+  const requestResetCompanyAdminPassword = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!resetPasswordTargetCompany) return;
+    setPendingAction({
+      title: `Reset ${resetPasswordTargetCompany.name}'s admin password?`,
+      description: 'The current admin sessions will end. A temporary password will be shown once after the reset.',
+      confirmLabel: 'Reset password', tone: 'warning', icon: <KeyRound className="h-4 w-4" />,
+      run: handleResetCompanyAdminPassword,
+    });
   };
 
   const changeStatus = async (id: string, status: 'ACTIVE' | 'SUSPENDED') => {
@@ -480,6 +547,8 @@ export function App() {
     } catch (err: any) {
       addToast(apiErrorMessage(err, 'Failed to delete company'), 'error');
       setDeleteTargetCompany(null);
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -558,7 +627,7 @@ export function App() {
                   <div>
                     <label className="block text-xs font-semibold text-gray-600 mb-1.5">Username</label>
                     <input required autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)}
-                      className="w-full bg-gray-50 border border-gray-200 text-gray-900 rounded-md px-3.5 py-2.5 text-sm outline-none focus:border-green-600 focus:ring-2 focus:ring-green-100 transition-all" />
+                      className="login-input w-full border border-gray-200 text-gray-900 rounded-md px-3.5 py-2.5 text-sm outline-none focus:border-green-600 focus:ring-2 focus:ring-green-100 transition-all" />
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-gray-600 mb-1.5">Password</label>
@@ -569,7 +638,7 @@ export function App() {
                         type={showLoginPassword ? 'text' : 'password'}
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        className="w-full bg-gray-50 border border-gray-200 text-gray-900 rounded-md px-3.5 py-2.5 text-sm outline-none focus:border-green-600 focus:ring-2 focus:ring-green-100 transition-all pr-10"
+                        className="login-input w-full border border-gray-200 text-gray-900 rounded-md px-3.5 py-2.5 text-sm outline-none focus:border-green-600 focus:ring-2 focus:ring-green-100 transition-all pr-10"
                       />
                       <button
                         type="button"
@@ -619,7 +688,7 @@ export function App() {
     return <CustomerDashboard token={token} session={session} onLogout={logout} />;
   }
 
-  const activeSubscriptions = subscriptions.filter((item) => item.status === 'ACTIVE').length;
+  const activeSubscriptions = platformSummary.activeSubscriptions;
   const tabLabels: Record<TabType, string> = {
     subscription_form: 'Company Subscription',
     subscriptions_table: 'Company Subscriptions',
@@ -827,10 +896,10 @@ export function App() {
             {/* ── KPI Cards ──────────────────────────────────────────── */}
             <div className="mb-6 grid grid-cols-2 lg:grid-cols-4 gap-4">
               {[
-                { label: 'Total Companies', value: companies.length, icon: <KpiIconBuilding />, accent: '#dcfce7', border: '#bbf7d0' },
+                { label: 'Total Companies', value: platformSummary.companies, icon: <KpiIconBuilding />, accent: '#dcfce7', border: '#bbf7d0' },
                 { label: 'Active Subscriptions', value: activeSubscriptions, icon: <KpiIconSubscription />, accent: '#ede9fe', border: '#ddd6fe' },
-                { label: 'Employee Keys', value: licenses.length, icon: <KpiIconKeys />, accent: '#dbeafe', border: '#bfdbfe' },
-                { label: 'Activated Devices', value: licenses.reduce((sum, item) => sum + (item.currentDevices || 0), 0), icon: <KpiIconDevices />, accent: '#ffedd5', border: '#fed7aa' },
+                { label: 'Employee Keys', value: platformSummary.licenses, icon: <KpiIconKeys />, accent: '#dbeafe', border: '#bfdbfe' },
+                { label: 'Activated Devices', value: platformSummary.activatedDevices, icon: <KpiIconDevices />, accent: '#ffedd5', border: '#fed7aa' },
               ].map(({ label, value, icon, accent, border }) => (
                 <div key={label} className="bg-white rounded-md shadow-sm border border-gray-200 p-4 sm:p-5 flex items-start gap-3 hover:shadow-md transition-shadow">
                   <div className="rounded-md p-2.5 shrink-0" style={{ background: accent, border: `1px solid ${border}` }}>
@@ -1029,7 +1098,7 @@ export function App() {
                 <div className="px-5 py-4 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <h2 className="font-bold text-sm text-gray-900">Company Subscriptions</h2>
-                    <p className="text-xs text-gray-400 mt-0.5">{subscriptions.length} companies on platform</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{totalSubscriptions} companies on platform</p>
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="text-xs font-semibold px-2.5 py-1 rounded-full border" style={{ background: '#dcfce7', color: '#15803d', borderColor: '#bbf7d0' }}>
@@ -1075,12 +1144,12 @@ export function App() {
                 </div>
 
                 {(() => {
-                  const totalSubItems = subscriptions.length;
+                  const totalSubItems = totalSubscriptions;
                   const totalSubPages = Math.max(1, Math.ceil(totalSubItems / subPageSize));
                   const safeSubPage = Math.min(Math.max(1, subPage), totalSubPages);
                   const subStartIndex = (safeSubPage - 1) * subPageSize;
                   const subEndIndex = Math.min(subStartIndex + subPageSize, totalSubItems);
-                  const paginatedSubscriptions = subscriptions.slice(subStartIndex, subEndIndex);
+                  const paginatedSubscriptions = subscriptions;
 
                   return (
                     <>
@@ -1116,36 +1185,64 @@ export function App() {
                                     {item.status}
                                   </span>
                                 </td>
-                                <td className="px-3 py-3 space-x-2 whitespace-nowrap">
-                                  <button
+                                <td className="px-3 py-3 space-x-1.5 whitespace-nowrap">
+                                  <ActionIconButton
+                                    label={`Edit ${item.company?.name || 'company'} subscription`}
+                                    tone="info"
                                     onClick={() => openEditModal(item)}
-                                    className="px-2.5 py-1 border border-blue-200 rounded-md text-blue-700 hover:bg-blue-50 text-[11px] font-medium transition-colors"
-                                    title="Edit Company Record"
                                   >
-                                    <Pencil className="inline w-3 h-3 mr-1" />
-                                    Edit
-                                  </button>
-                                  <button
+                                    <Pencil className="h-4 w-4" />
+                                  </ActionIconButton>
+                                  <ActionIconButton
+                                    label={`Reset admin password for ${item.company?.name || 'company'}`}
+                                    tone="info"
                                     onClick={() => {
                                       setResetPasswordTargetCompany(item.company);
                                       setResetPasswordResult(null);
                                       setCustomCompanyPassword('');
                                     }}
-                                    className="px-2.5 py-1 border border-blue-200 rounded-md text-blue-700 hover:bg-blue-50 text-[11px] font-medium transition-colors"
                                   >
-                                    <KeyRound className="inline w-3 h-3 mr-1" />
-                                    Reset Pass
-                                  </button>
-                                  <button onClick={() => renew(item.id)} className="px-2.5 py-1 border border-gray-200 rounded-md hover:bg-gray-100 text-gray-600 transition-colors text-[11px] font-medium">Renew 30d</button>
+                                    <KeyRound className="h-4 w-4" />
+                                  </ActionIconButton>
+                                  <ActionIconButton
+                                    label={`Renew ${item.company?.name || 'company'} for 30 days`}
+                                    onClick={() => setPendingAction({
+                                      title: `Renew ${item.company?.name || 'company'} for 30 days?`,
+                                      description: 'The subscription expiry will be extended by 30 days.',
+                                      confirmLabel: 'Renew 30 days', tone: 'success', icon: <RefreshCw className="h-4 w-4" />,
+                                      run: () => renew(item.id),
+                                    })}
+                                  >
+                                    <RefreshCw className="h-4 w-4" />
+                                  </ActionIconButton>
                                   {item.status === 'ACTIVE'
-                                    ? <button onClick={() => changeStatus(item.id, 'SUSPENDED')} className="px-2.5 py-1 border border-amber-200 rounded-md text-amber-700 hover:bg-amber-50 text-[11px] font-medium transition-colors"><PauseCircle className="inline w-3 h-3 mr-1" />Suspend</button>
-                                    : <button onClick={() => changeStatus(item.id, 'ACTIVE')} className="px-2.5 py-1 border border-green-200 rounded-md text-green-700 hover:bg-green-50 text-[11px] font-medium transition-colors"><PlayCircle className="inline w-3 h-3 mr-1" />Activate</button>}
-                                  <button
+                                    ? <ActionIconButton
+                                        label={`Suspend ${item.company?.name || 'company'} subscription`}
+                                        tone="warning"
+                                        onClick={() => setPendingAction({
+                                          title: `Suspend ${item.company?.name || 'company'}?`,
+                                          description: 'Company employees will be blocked from signing in, capturing, and uploading until the subscription is active again.',
+                                          confirmLabel: 'Suspend subscription', tone: 'warning', icon: <PauseCircle className="h-4 w-4" />,
+                                          run: () => changeStatus(item.id, 'SUSPENDED'),
+                                        })}
+                                      ><PauseCircle className="h-4 w-4" /></ActionIconButton>
+                                    : <ActionIconButton
+                                        label={`Activate ${item.company?.name || 'company'} subscription`}
+                                        tone="success"
+                                        onClick={() => setPendingAction({
+                                          title: `Activate ${item.company?.name || 'company'}?`,
+                                          description: 'Company employees will regain access if their individual accounts and licenses are active.',
+                                          confirmLabel: 'Activate subscription', tone: 'success', icon: <PlayCircle className="h-4 w-4" />,
+                                          run: () => changeStatus(item.id, 'ACTIVE'),
+                                        })}
+                                      ><PlayCircle className="h-4 w-4" /></ActionIconButton>}
+                                  <ActionIconButton
+                                    label={`Delete ${item.company?.name || 'company'}`}
+                                    tone="danger"
                                     onClick={() => setDeleteTargetCompany(item.company)}
-                                    className="px-2.5 py-1 border border-red-200 rounded-md text-red-700 hover:bg-red-50 text-[11px] font-medium transition-colors"
                                   >
-                                    <Trash2 className="inline w-3 h-3 mr-1" />Delete
-                                  </button>
+                                    <Trash2 className="h-4 w-4" />
+                                  </ActionIconButton>
                                 </td>
                               </tr>
                             ))}
@@ -1193,7 +1290,7 @@ export function App() {
                 <div className="px-5 py-4 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <h2 className="font-bold text-sm text-gray-900">Employee License Key Oversight</h2>
-                    <p className="text-xs text-gray-400 mt-0.5">{licenses.length} keys issued across all organizations</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{totalLicenses} keys issued across all organizations</p>
                   </div>
                   <div className="flex items-center space-x-2 text-xs text-gray-600">
                     <span className="font-medium">Records per page:</span>
@@ -1234,12 +1331,12 @@ export function App() {
                 </div>
 
                 {(() => {
-                  const totalLicItems = licenses.length;
+                  const totalLicItems = totalLicenses;
                   const totalLicPages = Math.max(1, Math.ceil(totalLicItems / licPageSize));
                   const safeLicPage = Math.min(Math.max(1, licPage), totalLicPages);
                   const licStartIndex = (safeLicPage - 1) * licPageSize;
                   const licEndIndex = Math.min(licStartIndex + licPageSize, totalLicItems);
-                  const paginatedLicenses = licenses.slice(licStartIndex, licEndIndex);
+                  const paginatedLicenses = licenses;
 
                   return (
                     <>
@@ -1274,10 +1371,15 @@ export function App() {
                                   </span>
                                 </td>
                                 <td className="px-3 py-3">
-                                  <button onClick={() => resetDevices(item.id)}
-                                    className="px-2.5 py-1 bg-gray-100 border border-gray-200 hover:bg-gray-200 rounded-md font-semibold text-gray-700 transition-colors whitespace-nowrap text-[11px]">
-                                    Reset Devices
-                                  </button>
+                                  <ActionIconButton
+                                    label={`Reset device bindings for ${item.user?.username || item.key}`}
+                                    onClick={() => setPendingAction({
+                                      title: `Reset devices for ${item.user?.username || item.key}?`,
+                                      description: 'Current device bindings will be removed. The employee must activate the key again.',
+                                      confirmLabel: 'Reset devices', tone: 'warning', icon: <RotateCcw className="h-4 w-4" />,
+                                      run: () => resetDevices(item.id),
+                                    })}
+                                  ><RotateCcw className="h-4 w-4" /></ActionIconButton>
                                 </td>
                               </tr>
                             ))}
@@ -1392,7 +1494,7 @@ export function App() {
                 </div>
               </div>
             ) : (
-              <form onSubmit={handleResetCompanyAdminPassword} className="space-y-4">
+              <form onSubmit={requestResetCompanyAdminPassword} className="space-y-4">
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
                     New Custom Password (Optional)
@@ -1469,7 +1571,7 @@ export function App() {
               </button>
             </div>
 
-            <form onSubmit={handleUpdateCompanySubscription} className="p-6 space-y-4">
+            <form onSubmit={requestUpdateCompanySubscription} className="p-6 space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">Company Name</label>
                 <input
@@ -1591,11 +1693,16 @@ export function App() {
               </button>
               <button
                 type="button"
-                onClick={() => deleteCompany(deleteTargetCompany.id)}
-                className="px-4 py-2 bg-red-600 text-white rounded-md text-xs font-semibold hover:bg-red-700 transition-colors shadow-sm flex items-center gap-1.5"
+                onClick={() => {
+                  if (deleteLoading) return;
+                  setDeleteLoading(true);
+                  void deleteCompany(deleteTargetCompany.id);
+                }}
+                disabled={deleteLoading}
+                className="px-4 py-2 bg-red-600 text-white rounded-md text-xs font-semibold hover:bg-red-700 transition-colors shadow-sm flex items-center gap-1.5 disabled:opacity-50"
               >
                 <Trash2 className="w-3.5 h-3.5" />
-                <span>Delete Company Forever</span>
+                <span>{deleteLoading ? 'Deleting…' : 'Delete Company Forever'}</span>
               </button>
             </div>
           </div>
@@ -1603,6 +1710,20 @@ export function App() {
       )}
 
       <ConfirmDialog open={logoutConfirmationOpen} onCancel={() => setLogoutConfirmationOpen(false)} onConfirm={performLogout} />
+      <ConfirmDialog
+        open={Boolean(pendingAction)}
+        onCancel={() => setPendingAction(null)}
+        onConfirm={async () => {
+          if (!pendingAction) return;
+          await pendingAction.run();
+          setPendingAction(null);
+        }}
+        title={pendingAction?.title}
+        description={pendingAction?.description}
+        confirmLabel={pendingAction?.confirmLabel}
+        tone={pendingAction?.tone}
+        icon={pendingAction?.icon}
+      />
       <ToastContainer toasts={toasts} onDismiss={removeToast} />
     </div>
   );

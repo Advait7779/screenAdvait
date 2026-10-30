@@ -131,7 +131,7 @@ export function App() {
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     placeholder="kgsoftware"
-                    className="w-full bg-gray-50 border border-gray-200 text-gray-900 rounded-md px-3.5 py-2.5 text-sm outline-none focus:border-green-600 focus:ring-2 focus:ring-green-100 transition-all"
+                    className="login-input w-full border border-gray-200 text-gray-900 rounded-md px-3.5 py-2.5 text-sm outline-none focus:border-green-600 focus:ring-2 focus:ring-green-100 transition-all"
                   />
                 </div>
 
@@ -145,7 +145,7 @@ export function App() {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="••••••••••••"
-                      className="w-full bg-gray-50 border border-gray-200 text-gray-900 rounded-md px-3.5 py-2.5 text-sm outline-none focus:border-green-600 focus:ring-2 focus:ring-green-100 transition-all pr-10"
+                      className="login-input w-full border border-gray-200 text-gray-900 rounded-md px-3.5 py-2.5 text-sm outline-none focus:border-green-600 focus:ring-2 focus:ring-green-100 transition-all pr-10"
                     />
                     <button
                       type="button"

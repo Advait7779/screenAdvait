@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Query, UseGuards, Req } from '@nestjs/common';
 import { LicenseService } from './license.service.js';
 import { AuthGuard } from '@nestjs/passport';
 import {
@@ -12,6 +12,7 @@ import { Role } from '@prisma/client';
 import { Roles } from '../common/roles.decorator.js';
 import { RolesGuard } from '../common/roles.guard.js';
 import { ZodValidationPipe } from '../common/zod-validation.pipe.js';
+import { parsePage, parsePageSize } from '../common/pagination.js';
 
 @Controller('v1/licenses')
 export class LicenseController {
@@ -36,7 +37,10 @@ export class LicenseController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(Role.SUPER_ADMIN)
   @Get()
-  async getAllLicenses() {
+  async getAllLicenses(@Query('page') page?: string, @Query('pageSize') pageSize?: string) {
+    if (page !== undefined || pageSize !== undefined) {
+      return this.licenseService.getLicensePage(parsePage(page), parsePageSize(pageSize));
+    }
     return this.licenseService.getAllLicenses();
   }
 

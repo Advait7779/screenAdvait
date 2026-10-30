@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { Role } from '@prisma/client';
 import {
@@ -13,6 +13,7 @@ import { Roles } from '../common/roles.decorator.js';
 import { RolesGuard } from '../common/roles.guard.js';
 import { ZodValidationPipe } from '../common/zod-validation.pipe.js';
 import { SubscriptionService } from './subscription.service.js';
+import { parsePage, parsePageSize } from '../common/pagination.js';
 
 @Controller('v1/subscriptions')
 @UseGuards(AuthGuard('jwt'), RolesGuard)
@@ -21,7 +22,10 @@ export class SubscriptionController {
   constructor(private readonly subscriptions: SubscriptionService) {}
 
   @Get()
-  getAll() {
+  getAll(@Query('page') page?: string, @Query('pageSize') pageSize?: string) {
+    if (page !== undefined || pageSize !== undefined) {
+      return this.subscriptions.getPage(parsePage(page), parsePageSize(pageSize));
+    }
     return this.subscriptions.getAll();
   }
 

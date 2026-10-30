@@ -21,6 +21,7 @@ import { Roles } from '../common/roles.decorator.js';
 import { RolesGuard } from '../common/roles.guard.js';
 import { ZodValidationPipe } from '../common/zod-validation.pipe.js';
 import { ScreenshotService } from './screenshot.service.js';
+import { parsePage, parsePageSize } from '../common/pagination.js';
 
 @Controller('v1/screenshots')
 @UseGuards(AuthGuard('jwt'), RolesGuard)
@@ -111,17 +112,39 @@ export class ScreenshotController {
     );
   }
 
+  @Get('company/days')
+  @Roles(Role.COMPANY_ADMIN, Role.SUPER_ADMIN)
+  getCompanyDays(
+    @Req() req: any,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+    @Query('search') search?: string,
+    @Query('timeZone') timeZone?: string,
+  ) {
+    return this.screenshotService.getCompanyDays(
+      req.user.companyId,
+      parsePage(page),
+      parsePageSize(pageSize, 30, 10),
+      search,
+      timeZone,
+    );
+  }
+
   @Get('company')
   @Roles(Role.COMPANY_ADMIN, Role.SUPER_ADMIN)
   getCompanyScreenshots(
     @Req() req: any,
     @Query('cursor') cursor?: string,
     @Query('limit') limit?: string,
+    @Query('day') day?: string,
+    @Query('search') search?: string,
+    @Query('timeZone') timeZone?: string,
   ) {
     return this.screenshotService.getCompanyScreenshots(
       req.user.companyId,
       cursor,
       this.parseLimit(limit),
+      { day, search, timeZone },
     );
   }
 

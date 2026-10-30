@@ -120,6 +120,7 @@ model User {
   settings    Setting?
 
   @@index([companyId, role])
+  @@index([companyId, role, createdAt(sort: Desc), id(sort: Desc)])
   @@map("users")
 }
 
@@ -149,6 +150,7 @@ model License {
   @@index([companyId, status])
   @@index([subscriptionId, status])
   @@index([userId])
+  @@index([createdAt(sort: Desc), id(sort: Desc)])
   @@map("licenses")
 }
 
@@ -210,6 +212,7 @@ model Screenshot {
 
   @@index([companyId, capturedAt])
   @@index([userId, capturedAt])
+  @@index([companyId, capturedAt(sort: Desc), id(sort: Desc)])
   @@index([deviceId])
   @@map("screenshots")
 }
@@ -305,6 +308,7 @@ model Subscription {
   licenses        License[]
 
   @@index([companyId, status])
+  @@index([createdAt(sort: Desc), id(sort: Desc)])
   @@map("subscriptions")
 }
 

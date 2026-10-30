@@ -5,7 +5,7 @@ import {
   NotFoundException,
   OnModuleInit,
 } from '@nestjs/common';
-import { Role, UploadStatus } from '@prisma/client';
+import { Prisma, Role, UploadStatus } from '@prisma/client';
 import * as crypto from 'crypto';
 import { EntitlementService } from '../entitlements/entitlement.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -156,9 +156,66 @@ export class ScreenshotService implements OnModuleInit {
     return this.toPage(screenshots, limit);
   }
 
-  async getCompanyScreenshots(companyId: string, cursor?: string, limit = 500) {
+  async getCompanyScreenshots(
+    companyId: string,
+    cursor?: string,
+    limit = 500,
+    filters: { day?: string; search?: string; timeZone?: string } = {},
+  ) {
+    const where: Prisma.ScreenshotWhereInput = { companyId };
+    if (filters.day) {
+      const timeZone = this.validateTimeZone(filters.timeZone);
+      this.validateDay(filters.day);
+      const [bounds] = await this.prisma.$queryRaw<{ start: Date; end: Date }[]>`
+        SELECT (${filters.day}::date::timestamp AT TIME ZONE ${timeZone}) AS start,
+               ((${filters.day}::date + 1)::timestamp AT TIME ZONE ${timeZone}) AS "end"
+      `;
+      where.capturedAt = { gte: bounds.start, lt: bounds.end };
+    }
+    if (filters.search) {
+      const search = this.validateSearch(filters.search);
+      const range = where.capturedAt as { gte: Date; lt: Date } | undefined;
+      const dayFilter = range
+        ? Prisma.sql`AND s."capturedAt" >= ${range.gte} AND s."capturedAt" < ${range.lt}`
+        : Prisma.empty;
+      const cursorFilter = cursor
+        ? Prisma.sql`AND (s."capturedAt", s.id) < (
+            SELECT c."capturedAt", c.id FROM screenshots c
+            WHERE c.id = ${cursor} AND c."companyId" = ${companyId}
+          )`
+        : Prisma.empty;
+      const rows = await this.prisma.$queryRaw<{
+        id: string;
+        companyId: string;
+        userId: string;
+        fileName: string;
+        fileSize: bigint;
+        capturedAt: Date;
+        username: string;
+        fullName: string;
+      }[]>`
+        SELECT s.id, s."companyId", s."userId", s."fileName", s."fileSize",
+               s."capturedAt", u.username, u."fullName"
+        FROM screenshots s JOIN users u ON u.id = s."userId"
+        WHERE s."companyId" = ${companyId} ${dayFilter}
+          AND (POSITION(LOWER(${search}) IN LOWER(s."fileName")) > 0
+            OR POSITION(LOWER(${search}) IN LOWER(u.username || ' ' || u."fullName")) > 0)
+          ${cursorFilter}
+        ORDER BY s."capturedAt" DESC, s.id DESC
+        LIMIT ${limit + 1}
+      `;
+      return this.toPage(rows.map((row) => ({
+        id: row.id,
+        companyId: row.companyId,
+        userId: row.userId,
+        fileName: row.fileName,
+        fileSize: row.fileSize,
+        capturedAt: row.capturedAt,
+        user: { id: row.userId, username: row.username, fullName: row.fullName },
+      })), limit);
+    }
     const screenshots = await this.prisma.screenshot.findMany({
-      where: { companyId },
+      where,
       select: {
         id: true,
         companyId: true,
@@ -184,6 +241,79 @@ export class ScreenshotService implements OnModuleInit {
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     });
     return this.toPage(screenshots, limit);
+  }
+
+  async getCompanyDays(
+    companyId: string,
+    page: number,
+    pageSize: number,
+    rawSearch?: string,
+    rawTimeZone?: string,
+  ) {
+    const timeZone = this.validateTimeZone(rawTimeZone);
+    const search = this.validateSearch(rawSearch || '');
+    const filter = search
+      ? Prisma.sql`AND (POSITION(LOWER(${search}) IN LOWER(s."fileName")) > 0
+          OR POSITION(LOWER(${search}) IN LOWER(u.username || ' ' || u."fullName")) > 0)`
+      : Prisma.empty;
+    const [totals, days] = await Promise.all([
+      this.prisma.$queryRaw<{ days: bigint; screenshots: bigint }[]>`
+        SELECT COUNT(DISTINCT ((s."capturedAt" AT TIME ZONE 'UTC') AT TIME ZONE ${timeZone})::date) AS days,
+               COUNT(*) AS screenshots
+        FROM screenshots s JOIN users u ON u.id = s."userId"
+        WHERE s."companyId" = ${companyId} ${filter}
+      `,
+      this.prisma.$queryRaw<{
+        key: string;
+        capturedAt: Date;
+        screenshotCount: bigint;
+        employeeCount: bigint;
+      }[]>`
+        SELECT ((s."capturedAt" AT TIME ZONE 'UTC') AT TIME ZONE ${timeZone})::date::text AS key,
+               MAX(s."capturedAt") AS "capturedAt",
+               COUNT(*) AS "screenshotCount",
+               COUNT(DISTINCT s."userId") AS "employeeCount"
+        FROM screenshots s JOIN users u ON u.id = s."userId"
+        WHERE s."companyId" = ${companyId} ${filter}
+        GROUP BY ((s."capturedAt" AT TIME ZONE 'UTC') AT TIME ZONE ${timeZone})::date
+        ORDER BY ((s."capturedAt" AT TIME ZONE 'UTC') AT TIME ZONE ${timeZone})::date DESC
+        LIMIT ${pageSize} OFFSET ${(page - 1) * pageSize}
+      `,
+    ]);
+    return {
+      items: days.map((day) => ({
+        key: day.key,
+        capturedAt: day.capturedAt,
+        screenshotCount: Number(day.screenshotCount),
+        employeeCount: Number(day.employeeCount),
+      })),
+      totalDays: Number(totals[0]?.days || 0),
+      totalScreenshots: Number(totals[0]?.screenshots || 0),
+      page,
+      pageSize,
+    };
+  }
+
+  private validateTimeZone(value?: string) {
+    const timeZone = value || 'UTC';
+    if (timeZone.length > 100) throw new BadRequestException('Invalid timeZone');
+    try {
+      new Intl.DateTimeFormat('en-US', { timeZone });
+    } catch {
+      throw new BadRequestException('Invalid timeZone');
+    }
+    return timeZone;
+  }
+
+  private validateDay(value: string) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || Number.isNaN(Date.parse(`${value}T00:00:00Z`))) {
+      throw new BadRequestException('day must be a valid YYYY-MM-DD date');
+    }
+  }
+
+  private validateSearch(value: string) {
+    if (value.length > 100) throw new BadRequestException('search must be at most 100 characters');
+    return value;
   }
 
   async getFile(

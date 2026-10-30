@@ -111,6 +111,28 @@ export class CompanyService {
     }));
   }
 
+  getCompanyOptions() {
+    return this.prisma.company.findMany({
+      select: { id: true, name: true, code: true },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    });
+  }
+
+  async getPlatformSummary() {
+    const [companies, activeSubscriptions, licenses, devices] = await Promise.all([
+      this.prisma.company.count(),
+      this.prisma.subscription.count({ where: { status: 'ACTIVE' } }),
+      this.prisma.license.count(),
+      this.prisma.license.aggregate({ _sum: { currentDevices: true } }),
+    ]);
+    return {
+      companies,
+      activeSubscriptions,
+      licenses,
+      activatedDevices: devices._sum.currentDevices || 0,
+    };
+  }
+
   async resetCompanyAdminPassword(
     companyId: string,
     superAdminUserId: string,

@@ -22,9 +22,11 @@ import {
   Trash2,
   Eye,
   EyeOff,
+  Power,
 } from 'lucide-react';
 import axios from 'axios';
 import { ConfirmDialog } from './ConfirmDialog';
+import { ActionIconButton } from './ActionIconButton';
 import { ToastContainer, ToastMessage } from './ToastContainer';
 
 const API_URL =
@@ -35,13 +37,15 @@ const DESKTOP_DOWNLOAD_URL =
   '/download/ScreenAdvait-Desktop-Setup.zip';
 const auth = (token: string) => ({ headers: { Authorization: `Bearer ${token}` } });
 
-async function fetchAllCompanyScreenshots(token: string) {
+const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+
+async function fetchCompanyDayScreenshots(token: string, day: string, search = '') {
   const items: any[] = [];
   let cursor: string | null = null;
-  for (let page = 0; page < 100; page += 1) {
+  for (let page = 0; page < 1000; page += 1) {
     const response: any = await axios.get(`${API_URL}/screenshots/company`, {
       ...auth(token),
-      params: { limit: 1000, ...(cursor ? { cursor } : {}) },
+      params: { limit: 1000, day, search, timeZone, ...(cursor ? { cursor } : {}) },
     });
     if (Array.isArray(response.data)) return response.data;
     const pageItems = Array.isArray(response.data?.items) ? response.data.items : [];
@@ -49,7 +53,7 @@ async function fetchAllCompanyScreenshots(token: string) {
     cursor = response.data?.nextCursor || null;
     if (!cursor) return items;
   }
-  throw new Error('The screenshot archive is too large to load safely. Narrow the retention period.');
+  throw new Error('This date folder is too large to load.');
 }
 
 function apiErrorMessage(error: any, fallback: string) {
@@ -159,8 +163,25 @@ interface CustomerDashboardProps {
   onLogout: () => void;
 }
 
+type PendingAction = {
+  title: string;
+  description: string;
+  confirmLabel: string;
+  tone: 'danger' | 'warning' | 'success' | 'info';
+  icon: React.ReactNode;
+  run: () => Promise<void>;
+};
+
 export function CustomerDashboard({ token, session, onLogout }: CustomerDashboardProps) {
-  const [screenshots, setScreenshots] = useState<any[]>([]);
+  const [recentDays, setRecentDays] = useState<any[]>([]);
+  const [archiveDays, setArchiveDays] = useState<any[]>([]);
+  const [archiveTotalDays, setArchiveTotalDays] = useState(0);
+  const [archiveTotalScreenshots, setArchiveTotalScreenshots] = useState(0);
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const daysRequest = React.useRef(0);
+  const employeesRequest = React.useRef(0);
+  const loadedDays = React.useRef(new Set<string>());
+  const loadingDays = React.useRef(new Set<string>());
   const [overview, setOverview] = useState<any>(null);
   const [view, setView] = useState<'captures' | 'all-screenshots' | 'employees'>('employees');
   const [loading, setLoading] = useState(false);
@@ -207,6 +228,8 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
   });
   const [passwordResetTarget, setPasswordResetTarget] = useState<any>(null);
   const [deleteTarget, setDeleteTarget] = useState<any>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const [replacementPassword, setReplacementPassword] = useState('');
 
   const addToast = (text: string, type: 'success' | 'error' | 'info' = 'success') => {
@@ -219,8 +242,21 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
   };
 
   useEffect(() => {
-    void fetchCustomerData();
+    void fetchSummary().catch((error) => handleLoadError(error, 'Could not load company data'));
   }, [token]);
+
+  useEffect(() => {
+    if (view === 'employees') void fetchEmployeePage().catch((error) => handleLoadError(error, 'Could not load employees'));
+  }, [token, view, empPage, empPageSize]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(archiveSearch), 300);
+    return () => window.clearTimeout(timer);
+  }, [archiveSearch]);
+
+  useEffect(() => {
+    if (view === 'captures' || view === 'all-screenshots') void fetchDays().catch((error) => handleLoadError(error, 'Could not load screenshot folders'));
+  }, [token, view, archivePage, archivePageSize, debouncedSearch]);
 
   const show = (value: string, isError = false) => {
     setMessage(value);
@@ -228,15 +264,59 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
     if (value) addToast(value, isError ? 'error' : 'success');
   };
 
+  const handleLoadError = (error: any, fallback: string) => {
+    show(apiErrorMessage(error, fallback), true);
+    if (error.response?.status === 401 || error.response?.status === 403) onLogout();
+  };
+
+  const fetchSummary = async () => {
+    const response = await axios.get(`${API_URL}/company-admin/summary`, auth(token));
+    setOverview(response.data);
+  };
+
+  const fetchEmployeePage = async () => {
+    const request = ++employeesRequest.current;
+    const response = await axios.get(`${API_URL}/company-admin/employees`, {
+      ...auth(token), params: { page: empPage, pageSize: empPageSize },
+    });
+    if (request !== employeesRequest.current) return;
+    setEmployees(response.data.items);
+    setTotalEmployees(response.data.total);
+    const lastPage = Math.max(1, Math.ceil(response.data.total / empPageSize));
+    if (empPage > lastPage) setEmpPage(lastPage);
+  };
+
+  const fetchDays = async () => {
+    const request = ++daysRequest.current;
+    const recent = view === 'captures';
+    const response = await axios.get(`${API_URL}/screenshots/company/days`, {
+      ...auth(token),
+      params: { page: recent ? 1 : archivePage, pageSize: recent ? 5 : archivePageSize,
+        search: recent ? '' : debouncedSearch, timeZone },
+    });
+    if (request !== daysRequest.current) return;
+    const days = response.data.items.map((day: any) => ({ ...day, items: [], employees: [] }));
+    loadedDays.current.clear();
+    loadingDays.current.clear();
+    setExpandedDates({});
+    setExpandedEmployees({});
+    if (recent) setRecentDays(days);
+    else {
+      setArchiveDays(days);
+      setArchiveTotalDays(response.data.totalDays);
+      setArchiveTotalScreenshots(response.data.totalScreenshots);
+      const lastPage = Math.max(1, Math.ceil(response.data.totalDays / archivePageSize));
+      if (archivePage > lastPage) setArchivePage(lastPage);
+    }
+  };
+
+  const [employees, setEmployees] = useState<any[]>([]);
+  const [totalEmployees, setTotalEmployees] = useState(0);
+
   const fetchCustomerData = async (isManual = false) => {
     setLoading(true);
     try {
-      const [shots, company] = await Promise.all([
-        fetchAllCompanyScreenshots(token),
-        axios.get(`${API_URL}/company-admin/overview`, auth(token)),
-      ]);
-      setScreenshots(shots);
-      setOverview(company.data);
+      await Promise.all([fetchSummary(), ...(view === 'employees' ? [fetchEmployeePage()] : view === 'captures' || view === 'all-screenshots' ? [fetchDays()] : [])]);
       if (isManual) addToast('Workspace data refreshed.', 'info');
     } catch (error: any) {
       show(apiErrorMessage(error, 'Could not load company data'), true);
@@ -304,13 +384,8 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
     }
   };
 
-  const resetEmployeePassword = async (event: React.FormEvent) => {
-    event.preventDefault();
+  const resetEmployeePassword = async () => {
     if (!passwordResetTarget) return;
-    if (replacementPassword.length < 6) {
-      show('New password must be at least 6 characters.', true);
-      return;
-    }
     try {
       await axios.post(
         `${API_URL}/company-admin/employees/${passwordResetTarget.id}/reset-password`,
@@ -323,6 +398,21 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
     } catch (error: any) {
       show(apiErrorMessage(error, 'Could not reset employee password'), true);
     }
+  };
+
+  const requestPasswordReset = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!passwordResetTarget) return;
+    if (replacementPassword.length < 6) {
+      show('New password must be at least 6 characters.', true);
+      return;
+    }
+    setPendingAction({
+      title: `Reset ${passwordResetTarget.username}'s password?`,
+      description: 'Their current sessions will be signed out and the new temporary password will take effect.',
+      confirmLabel: 'Reset password', tone: 'warning', icon: <KeyRound className="h-4 w-4" />,
+      run: resetEmployeePassword,
+    });
   };
 
   const createLicense = async (employeeId: string) => {
@@ -392,10 +482,28 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
       }));
   };
 
-  const screenshotDays = buildGroupedDays(screenshots);
+  const screenshotDays = recentDays;
 
   const toggleDate = (dayKey: string) => {
     setExpandedDates((current) => ({ ...current, [dayKey]: !current[dayKey] }));
+    if (loadedDays.current.has(dayKey) || loadingDays.current.has(dayKey)) return;
+    loadingDays.current.add(dayKey);
+    const request = daysRequest.current;
+    const archive = dayKey.startsWith('archive::');
+    const day = archive ? dayKey.slice('archive::'.length) : dayKey;
+    void fetchCompanyDayScreenshots(token, day, archive ? debouncedSearch : '')
+      .then((items) => {
+        if (request !== daysRequest.current) return;
+        const grouped = buildGroupedDays(items)[0];
+        const update = (days: any[]) => days.map((item) => item.key === day
+          ? { ...item, items, employees: grouped?.employees || [] }
+          : item);
+        if (archive) setArchiveDays(update);
+        else setRecentDays(update);
+        loadedDays.current.add(dayKey);
+      })
+      .catch((error) => handleLoadError(error, 'Could not load date folder'))
+      .finally(() => loadingDays.current.delete(dayKey));
   };
 
   const toggleEmployee = (folderKey: string) => {
@@ -417,7 +525,7 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
     { label: 'Subscription', value: subscription?.status || 'NOT CONFIGURED', icon: <KpiIconStatus />, accent: '#dcfce7', border: '#bbf7d0' },
     { label: 'Expires', value: subscription?.endDate ? new Date(subscription.endDate).toLocaleDateString() : '—', icon: <KpiIconExpiry />, accent: '#ede9fe', border: '#ddd6fe' },
     { label: 'Employees', value: `${overview?.usage?.employees || 0} / ${subscription?.maxEmployees || 0}`, icon: <KpiIconEmployees />, accent: '#dbeafe', border: '#bfdbfe' },
-    { label: 'Screenshots', value: screenshots.length, icon: <Image className="h-[22px] w-[22px] text-orange-600" />, accent: '#ffedd5', border: '#fed7aa' },
+    { label: 'Screenshots', value: overview?.usage?.screenshots || 0, icon: <Image className="h-[22px] w-[22px] text-orange-600" />, accent: '#ffedd5', border: '#fed7aa' },
   ];
 
   return (
@@ -651,13 +759,13 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
                     <h2 className="text-base font-bold text-gray-900">Latest Captured Employee Screenshots</h2>
                     <p className="text-xs text-gray-500 mt-0.5">Showing recent date folders and employee captures. Open a folder to view details.</p>
                   </div>
-                  {screenshots.length > 5 && (
+                  {(overview?.usage?.screenshots || 0) > 5 && (
                     <button
                       type="button"
                       onClick={() => setView('all-screenshots')}
                       className="px-3.5 py-1.5 bg-green-700 hover:bg-green-800 text-white rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm"
                     >
-                      <span>View All ({screenshots.length})</span>
+                      <span>View All ({overview?.usage?.screenshots || 0})</span>
                       <ChevronRight className="w-3.5 h-3.5" />
                     </button>
                   )}
@@ -682,7 +790,7 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
                                 {isToday(day.capturedAt) ? 'Today — ' : ''}{screenshotDayLabel(day.capturedAt)}
                               </span>
                               <span className="mt-0.5 block text-xs text-gray-400">
-                                {day.employees.length} employee{day.employees.length === 1 ? '' : 's'} · {day.items.length} screenshot{day.items.length === 1 ? '' : 's'}
+                                {day.employeeCount} employee{day.employeeCount === 1 ? '' : 's'} · {day.screenshotCount} screenshot{day.screenshotCount === 1 ? '' : 's'}
                               </span>
                             </span>
                             {dateOpen ? <ChevronDown className="h-4 w-4 shrink-0 text-gray-400" /> : <ChevronRight className="h-4 w-4 shrink-0 text-gray-400" />}
@@ -749,14 +857,14 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
 
                     <div className="mt-5 p-4 bg-white border border-gray-200 rounded-md flex flex-wrap items-center justify-between gap-3 shadow-sm">
                       <div className="text-xs text-gray-600 font-medium">
-                        Showing <b>latest {Math.min(5, screenshotDays.length)}</b> date folders ({screenshots.length} total screenshots).
+                        Showing <b>latest {Math.min(5, screenshotDays.length)}</b> date folders ({overview?.usage?.screenshots || 0} total screenshots).
                       </div>
                       <button
                         type="button"
                         onClick={() => setView('all-screenshots')}
                         className="px-4 py-2 bg-green-700 hover:bg-green-800 text-white rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm"
                       >
-                        <span>View All Screenshots ({screenshots.length})</span>
+                        <span>View All Screenshots ({overview?.usage?.screenshots || 0})</span>
                         <ChevronRight className="w-4 h-4" />
                       </button>
                     </div>
@@ -830,21 +938,13 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
                 </div>
 
                 {(() => {
-                  const matching = screenshots.filter((item) => {
-                    if (!archiveSearch) return true;
-                    const q = archiveSearch.toLowerCase();
-                    const user = (item.user?.username || '') + ' ' + (item.user?.fullName || '');
-                    return user.toLowerCase().includes(q) || (item.fileName || '').toLowerCase().includes(q);
-                  });
-
-                  const allArchiveDays = buildGroupedDays(matching);
-                  const totalDays = allArchiveDays.length;
-                  const totalScreenshots = matching.length;
+                  const totalDays = archiveTotalDays;
+                  const totalScreenshots = archiveTotalScreenshots;
                   const totalPages = Math.max(1, Math.ceil(totalDays / archivePageSize));
                   const safePage = Math.min(Math.max(1, archivePage), totalPages);
                   const startIndex = (safePage - 1) * archivePageSize;
                   const endIndex = Math.min(startIndex + archivePageSize, totalDays);
-                  const paginatedDays = allArchiveDays.slice(startIndex, endIndex);
+                  const paginatedDays = archiveDays;
 
                   return (
                     <>
@@ -864,7 +964,7 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
                                       {isToday(day.capturedAt) ? 'Today — ' : ''}{screenshotDayLabel(day.capturedAt)}
                                     </span>
                                     <span className="mt-0.5 block text-xs text-gray-400">
-                                      {day.employees.length} employee{day.employees.length === 1 ? '' : 's'} · {day.items.length} screenshot{day.items.length === 1 ? '' : 's'}
+                                      {day.employeeCount} employee{day.employeeCount === 1 ? '' : 's'} · {day.screenshotCount} screenshot{day.screenshotCount === 1 ? '' : 's'}
                                     </span>
                                   </span>
                                   {dateOpen ? <ChevronDown className="h-4 w-4 shrink-0 text-gray-400" /> : <ChevronRight className="h-4 w-4 shrink-0 text-gray-400" />}
@@ -994,7 +1094,7 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
                   <div className="border-b border-gray-100 px-5 py-4 flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <h2 className="font-bold text-sm text-gray-900">Company Employees &amp; Licenses</h2>
-                      <p className="text-xs text-gray-400 mt-0.5">{overview?.employees?.length || 0} employees registered</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{totalEmployees} employees registered</p>
                     </div>
 
                     <div className="flex items-center space-x-2 text-xs text-gray-600">
@@ -1036,13 +1136,13 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
                   </div>
 
                   {(() => {
-                    const allEmps = overview?.employees || [];
-                    const totalEmpItems = allEmps.length;
+                    const allEmps = employees;
+                    const totalEmpItems = totalEmployees;
                     const totalEmpPages = Math.max(1, Math.ceil(totalEmpItems / empPageSize));
                     const safeEmpPage = Math.min(Math.max(1, empPage), totalEmpPages);
                     const empStartIndex = (safeEmpPage - 1) * empPageSize;
                     const empEndIndex = Math.min(empStartIndex + empPageSize, totalEmpItems);
-                    const paginatedEmployees = allEmps.slice(empStartIndex, empEndIndex);
+                    const paginatedEmployees = allEmps;
 
                     return (
                       <>
@@ -1103,75 +1203,94 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
                                         </>
                                       ) : '—'}
                                     </td>
-                                    <td className="px-3 py-3 space-x-2 whitespace-nowrap">
+                                    <td className="px-3 py-3 space-x-1.5 whitespace-nowrap">
                                       {!license && (
-                                        <button
+                                        <ActionIconButton
+                                          label={`Generate license key for ${item.username}`}
+                                          tone="success"
                                           disabled={!isActive}
-                                          onClick={() => createLicense(item.id)}
-                                          className="rounded-md px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-40 transition-all"
-                                          style={{ background: 'linear-gradient(135deg, #15803d, #166534)' }}
+                                          onClick={() => setPendingAction({
+                                            title: `Generate a key for ${item.username}?`,
+                                            description: 'A new activation key will be issued and one device slot allocated.',
+                                            confirmLabel: 'Generate key', tone: 'success', icon: <KeyRound className="h-4 w-4" />,
+                                            run: () => createLicense(item.id),
+                                          })}
                                         >
-                                          <KeyRound className="mr-1 inline h-3 w-3" />
-                                          Generate Key
-                                        </button>
+                                          <KeyRound className="h-4 w-4" />
+                                        </ActionIconButton>
                                       )}
                                       {license && (
-                                        <button
-                                          onClick={() => licenseAction(license.id, 'reset-devices')}
-                                          className="rounded-md border border-gray-200 px-2.5 py-1.5 text-xs text-gray-600 hover:bg-gray-100 transition-colors"
+                                        <ActionIconButton
+                                          label={`Reset device binding for ${item.username}`}
+                                          onClick={() => setPendingAction({
+                                            title: `Reset ${item.username}'s device binding?`,
+                                            description: 'Their current device will be disconnected and must be activated again.',
+                                            confirmLabel: 'Reset device', tone: 'warning', icon: <RotateCcw className="h-4 w-4" />,
+                                            run: () => licenseAction(license.id, 'reset-devices'),
+                                          })}
                                         >
-                                          <RotateCcw className="mr-1 inline h-3 w-3" />
-                                          Reset
-                                        </button>
+                                          <RotateCcw className="h-4 w-4" />
+                                        </ActionIconButton>
                                       )}
                                       {license && license.status !== 'ACTIVE' && (
-                                        <button
-                                          onClick={() => licenseAction(license.id, 'reactivate')}
-                                          className="rounded-md bg-green-700 hover:bg-green-800 text-white px-2.5 py-1.5 text-xs font-semibold shadow-sm transition-all"
+                                        <ActionIconButton
+                                          label={`Reactivate license for ${item.username}`}
+                                          tone="success"
+                                          onClick={() => setPendingAction({
+                                            title: `Reactivate ${item.username}'s key?`,
+                                            description: 'The license will be available again if the company subscription is active.',
+                                            confirmLabel: 'Reactivate key', tone: 'success', icon: <Check className="h-4 w-4" />,
+                                            run: () => licenseAction(license.id, 'reactivate'),
+                                          })}
                                         >
-                                          <Check className="mr-1 inline h-3 w-3" />
-                                          Activate Key
-                                        </button>
+                                          <Check className="h-4 w-4" />
+                                        </ActionIconButton>
                                       )}
                                       {license && license.status !== 'REVOKED' && (
-                                        <button
-                                          onClick={() => licenseAction(license.id, 'revoke')}
-                                          className="rounded-md border border-red-200 px-2.5 py-1.5 text-xs text-red-600 hover:bg-red-50 transition-colors"
+                                        <ActionIconButton
+                                          label={`Revoke license for ${item.username}`}
+                                          tone="danger"
+                                          onClick={() => setPendingAction({
+                                            title: `Revoke ${item.username}'s key?`,
+                                            description: 'Their desktop access and future captures will be blocked until the key is reactivated.',
+                                            confirmLabel: 'Revoke key', tone: 'danger', icon: <XCircle className="h-4 w-4" />,
+                                            run: () => licenseAction(license.id, 'revoke'),
+                                          })}
                                         >
-                                          <XCircle className="mr-1 inline h-3 w-3" />
-                                          Revoke
-                                        </button>
+                                          <XCircle className="h-4 w-4" />
+                                        </ActionIconButton>
                                       )}
-                                      <button
-                                        type="button"
+                                      <ActionIconButton
+                                        label={`Reset password for ${item.username}`}
                                         onClick={() => {
                                           setPasswordResetTarget(item);
                                           setReplacementPassword('');
                                         }}
-                                        className="rounded-md border border-gray-200 px-2.5 py-1.5 text-xs text-gray-600 hover:bg-gray-100 transition-colors"
                                       >
-                                        <KeyRound className="mr-1 inline h-3 w-3" />
-                                        Password
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => void setEmployeeStatus(item, !item.isActive)}
-                                        className={`rounded-md border px-2.5 py-1.5 text-xs transition-colors ${
-                                          item.isActive
-                                            ? 'border-amber-200 text-amber-700 hover:bg-amber-50'
-                                            : 'border-green-200 text-green-700 hover:bg-green-50'
-                                        }`}
+                                        <KeyRound className="h-4 w-4" />
+                                      </ActionIconButton>
+                                      <ActionIconButton
+                                        label={`${item.isActive ? 'Disable' : 'Enable'} ${item.username}`}
+                                        tone={item.isActive ? 'warning' : 'success'}
+                                        onClick={() => setPendingAction({
+                                          title: `${item.isActive ? 'Disable' : 'Enable'} ${item.username}?`,
+                                          description: item.isActive
+                                            ? 'Their current sessions will end and they will be unable to sign in.'
+                                            : 'They will be able to sign in again if their license and subscription are active.',
+                                          confirmLabel: item.isActive ? 'Disable employee' : 'Enable employee',
+                                          tone: item.isActive ? 'warning' : 'success', icon: <Power className="h-4 w-4" />,
+                                          run: () => setEmployeeStatus(item, !item.isActive),
+                                        })}
                                       >
-                                        {item.isActive ? 'Disable' : 'Enable'}
-                                      </button>
-                                      <button
-                                        type="button"
+                                        <Power className="h-4 w-4" />
+                                      </ActionIconButton>
+                                      <ActionIconButton
+                                        label={`Delete ${item.username}`}
+                                        tone="danger"
                                         onClick={() => setDeleteTarget(item)}
-                                        className="rounded-md border border-red-200 px-2.5 py-1.5 text-xs text-red-600 hover:bg-red-50 transition-colors"
                                       >
-                                        <Trash2 className="mr-1 inline h-3 w-3" />
-                                        Delete
-                                      </button>
+                                        <Trash2 className="h-4 w-4" />
+                                      </ActionIconButton>
                                     </td>
                                   </tr>
                                 );
@@ -1224,6 +1343,20 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
         onCancel={() => setLogoutConfirmationOpen(false)}
         onConfirm={performLogout}
       />
+      <ConfirmDialog
+        open={Boolean(pendingAction)}
+        onCancel={() => setPendingAction(null)}
+        onConfirm={async () => {
+          if (!pendingAction) return;
+          await pendingAction.run();
+          setPendingAction(null);
+        }}
+        title={pendingAction?.title}
+        description={pendingAction?.description}
+        confirmLabel={pendingAction?.confirmLabel}
+        tone={pendingAction?.tone}
+        icon={pendingAction?.icon}
+      />
       {deleteTarget && (
         <div
           className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/55 p-4"
@@ -1257,13 +1390,19 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
               <button
                 type="button"
                 onClick={async () => {
-                  const target = deleteTarget;
-                  setDeleteTarget(null);
-                  await deleteEmployee(target);
+                  if (deleteLoading) return;
+                  setDeleteLoading(true);
+                  try {
+                    await deleteEmployee(deleteTarget);
+                    setDeleteTarget(null);
+                  } finally {
+                    setDeleteLoading(false);
+                  }
                 }}
-                className="rounded-md bg-red-600 px-4 py-2 text-xs font-semibold text-white hover:bg-red-700 shadow-sm transition-colors"
+                disabled={deleteLoading}
+                className="rounded-md bg-red-600 px-4 py-2 text-xs font-semibold text-white hover:bg-red-700 shadow-sm transition-colors disabled:opacity-50"
               >
-                Permanently Delete
+                {deleteLoading ? 'Deleting…' : 'Permanently Delete'}
               </button>
             </div>
           </div>
@@ -1280,7 +1419,7 @@ export function CustomerDashboard({ token, session, onLogout }: CustomerDashboar
           }}
         >
           <form
-            onSubmit={resetEmployeePassword}
+            onSubmit={requestPasswordReset}
             className="w-full max-w-md rounded-lg border border-gray-200 bg-white p-5 shadow-2xl"
           >
             <h2 id="reset-password-title" className="text-base font-bold text-gray-900">

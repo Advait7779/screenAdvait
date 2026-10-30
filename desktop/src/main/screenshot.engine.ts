@@ -14,6 +14,7 @@ import {
 import { getDeviceDetails } from './device.js';
 import { getApiUrl } from './ipc.js';
 import { uploadDirectToGoogleDrive } from './google-drive-client.js';
+import { requestWithTokenRefresh } from './auth-retry.js';
 
 let captureTimer: NodeJS.Timeout | null = null;
 let uploadTimer: NodeJS.Timeout | null = null;
@@ -98,6 +99,8 @@ export async function startScreenshotEngine(forceReset = false) {
     entitlementPaused = false;
     lastEntitlementCheck = 0;
   }
+  // Keep retrying validation after a cold start without connectivity.
+  startSyncWorker();
   if (!(await ensureEntitlementActive())) {
     paused = true;
     targetNextCaptureTime = 0;
@@ -110,7 +113,6 @@ export async function startScreenshotEngine(forceReset = false) {
   writeSetting('capturePaused', 'false');
   scheduleNextCapture();
   startResilientUploadWorker();
-  startSyncWorker();
 }
 
 export function pauseScreenshotEngine() {
@@ -391,7 +393,7 @@ async function refreshAccessToken() {
   try {
     const response = await axios.post(`${getApiUrl()}/auth/refresh`, {
       refreshToken: session.refreshToken,
-    });
+    }, { timeout: 8_000 });
     updateSessionTokens(response.data.accessToken, response.data.refreshToken);
     apiConnected = true;
     return true;
@@ -436,10 +438,15 @@ async function ensureEntitlementActive(force = false) {
     if (isAccessTokenExpired() && !(await refreshAccessToken())) return false;
     const current = getSession();
     if (!current) return false;
-    const response = await axios.get(`${getApiUrl()}/licenses/current-status`, {
-      headers: { Authorization: `Bearer ${current.accessToken}` },
-      timeout: 8_000,
-    });
+    const response = await requestWithTokenRefresh(
+      (accessToken) => axios.get(`${getApiUrl()}/licenses/current-status`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+        timeout: 8_000,
+      }),
+      current.accessToken,
+      async () => (await refreshAccessToken()) ? getSession()?.accessToken || null : null,
+    );
+    if (!response) return false;
     lastEntitlementCheck = Date.now();
     apiConnected = true;
     updateSessionLicenseStatus(response.data);
@@ -500,7 +507,8 @@ function startSyncWorker() {
   if (syncTimer) clearInterval(syncTimer);
   syncTimer = setInterval(async () => {
     if (getSession()) {
-      await ensureEntitlementActive(true);
+      const active = await ensureEntitlementActive(true);
+      if (active && !uploadTimer) startResilientUploadWorker();
     }
   }, 10_000);
 }

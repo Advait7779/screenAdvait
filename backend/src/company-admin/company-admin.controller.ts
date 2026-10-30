@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { Role } from '@prisma/client';
 import {
@@ -15,6 +15,7 @@ import { Roles } from '../common/roles.decorator.js';
 import { RolesGuard } from '../common/roles.guard.js';
 import { ZodValidationPipe } from '../common/zod-validation.pipe.js';
 import { CompanyAdminService } from './company-admin.service.js';
+import { parsePage, parsePageSize } from '../common/pagination.js';
 
 @Controller('v1/company-admin')
 @UseGuards(AuthGuard('jwt'), RolesGuard)
@@ -25,6 +26,16 @@ export class CompanyAdminController {
   @Get('overview')
   overview(@Req() req: any) {
     return this.companyAdmin.overview(req.user.companyId);
+  }
+
+  @Get('summary')
+  summary(@Req() req: any) {
+    return this.companyAdmin.summary(req.user.companyId);
+  }
+
+  @Get('employees')
+  employees(@Req() req: any, @Query('page') page?: string, @Query('pageSize') pageSize?: string) {
+    return this.companyAdmin.getEmployeePage(req.user.companyId, parsePage(page), parsePageSize(pageSize));
   }
 
   @Post('employees')

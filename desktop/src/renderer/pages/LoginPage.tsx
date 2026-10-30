@@ -194,7 +194,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, addToast }
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="Enter username"
-                  className="w-full bg-gray-50 border border-gray-200 rounded-md pl-9 pr-3 py-2 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:border-green-700 focus:ring-1 focus:ring-green-700 transition-all"
+                  className="login-input w-full border border-gray-200 rounded-md pl-9 pr-3 py-2 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:border-green-700 focus:ring-1 focus:ring-green-700 transition-all"
                 />
               </div>
             </div>
@@ -211,7 +211,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, addToast }
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full bg-gray-50 border border-gray-200 rounded-md pl-9 pr-10 py-2 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:border-green-700 focus:ring-1 focus:ring-green-700 transition-all"
+                  className="login-input w-full border border-gray-200 rounded-md pl-9 pr-10 py-2 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:border-green-700 focus:ring-1 focus:ring-green-700 transition-all"
                 />
                 <button
                   type="button"
